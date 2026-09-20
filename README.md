@@ -13,11 +13,12 @@ notificaciones y **Mercado Shops**, el módulo de tiendas con inventario y varia
 `docs/` contiene un recorrido estático del proyecto (capturas reales y explicación de la red de
 negocios) pensado para GitHub Pages: <https://to49ra16s7azr9u2-cmd.github.io/mercado/>.
 
-Para publicarlo hay dos caminos, cualquiera sirve:
+Publicación (configuración actual): **Settings → Pages → Source: «Deploy from a branch»**,
+rama `claude/lucid-meitner-eebxnm`, carpeta `/docs`. Cada push a esa rama actualiza el sitio.
 
-- **Settings → Pages → Source: «Deploy from a branch»**, rama `claude/lucid-meitner-eebxnm`, carpeta `/docs`.
-- **Settings → Pages → Source: «GitHub Actions»**: el flujo `.github/workflows/pages.yml` publica
-  `docs/` en cada push.
+Alternativa: cambiar el origen a **«GitHub Actions»** y usar `.github/workflows/pages.yml`
+(sólo se dispara en `main` o a mano, porque el entorno `github-pages` restringe los despliegues
+a la rama por defecto).
 
 La aplicación en sí es dinámica (Server Actions y base de datos), así que GitHub Pages sólo sirve
 el recorrido; para usarla se ejecuta en local como se indica abajo.

@@ -1,8 +1,10 @@
 name: GitHub Pages
 
+# Este flujo sólo hace falta si Pages se configura con origen «GitHub Actions».
+# Con el origen «Deploy from a branch» (rama + carpeta /docs) el sitio se publica solo.
 on:
   push:
-    branches: [main, "claude/**"]
+    branches: [main]
     paths: ["docs/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
