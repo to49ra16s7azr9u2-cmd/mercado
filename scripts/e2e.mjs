@@ -177,7 +177,10 @@ await step("abrir tienda en Mercado Shops", async () => {
   await sp2.selectOption("#ship_from", { label: "Jalisco" });
   await sp2.fill("#legal_name", "Tienda Automática S.A. de C.V.");
   await sp2.fill("#rfc", "TAU200101AB1");
-  await sp2.fill("#legal_address", "Av. Vallarta 1200, Col. Americana, Guadalajara, Jalisco, C.P. 44160");
+  await sp2.fill("#legal_address", "Av. Vallarta 1200, int. 4, Col. Americana");
+  await sp2.fill("#legal_zip", "44160");
+  await sp2.fill("#legal_city", "Guadalajara");
+  await sp2.selectOption("#legal_region", { label: "Jalisco" });
   await sp2.fill("#legal_phone", "3312345678");
   await sp2.fill("#legal_email", "contacto@tienda-automatica.mx");
   await sp2.getByRole("button", { name: /Enviar solicitud/ }).click();
