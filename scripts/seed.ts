@@ -388,8 +388,8 @@ for (const a of users.slice(1)) {
 const insertShop = db.prepare(
   `INSERT INTO shops (id, owner_id, name, slug, description, category, logo_seed, cover_emoji,
     business_type, legal_name, rfc, legal_address, legal_phone, legal_email, return_policy,
-    delivery_note, ship_from, status, created_at)
-   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?)`,
+    delivery_note, ship_from, specialty, sourcing_needs, is_producer, status, created_at)
+   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?)`,
 );
 const insertVariant = db.prepare(
   "INSERT INTO item_variants (item_id, label, sku, stock, position) VALUES (?,?,?,?,?)",
@@ -405,13 +405,17 @@ type ShopProduct = {
 
 const SHOPS: {
   name: string; owner: number; category: string; emoji: string; region: string;
-  description: string; legal: string; rfc: string; products: ShopProduct[];
+  description: string; legal: string; rfc: string; specialty: string; needs: string;
+  producer: number; products: ShopProduct[];
 }[] = [
   {
     name: "Boutique Xanath", owner: 1, category: "Moda y accesorios", emoji: "👗",
     region: "Ciudad de México",
     description: "Ropa de diseño mexicano en tirajes cortos. Enviamos a todo el país con guía rastreable y aceptamos cambios de talla.",
     legal: "Xanath Diseño S.A. de C.V.", rfc: "XDI210415AB2",
+    specialty: "confección y bordado a mano de manta y lino",
+    needs: "joyería artesanal, velas aromáticas, empaques de papel",
+    producer: 1,
     products: [
       { t: "Blusa de manta bordada a mano", e: "👚", cat: "mujer-blusas", brand: "Sin marca", price: 690,
         variants: [["Talla CH · Blanco", 6], ["Talla M · Blanco", 8], ["Talla G · Negro", 4]] },
@@ -428,6 +432,9 @@ const SHOPS: {
     region: "Jalisco",
     description: "Consolas, videojuegos y accesorios revisados pieza por pieza. Incluimos 30 días de garantía y factura.",
     legal: "Carlos Ramírez Pérez", rfc: "RAPC880712JH9",
+    specialty: "reacondicionamiento y garantía de consolas retro",
+    needs: "fundas tejidas, papelería creativa, accesorios de escritorio",
+    producer: 0,
     products: [
       { t: "Control inalámbrico compatible con Switch", e: "🎮", cat: "libros-videojuegos-switch", brand: "Sin marca", price: 520,
         variants: [["Negro", 12], ["Azul neón", 7], ["Rosa", 5]] },
@@ -442,6 +449,9 @@ const SHOPS: {
     region: "Nuevo León",
     description: "Muebles y decoración fabricados en Monterrey. Envíos a toda la república y entrega local sin costo.",
     legal: "Sol Interiores S. de R.L.", rfc: "SIN190320KL4",
+    specialty: "carpintería de madera de parota y herrería fina",
+    needs: "velas aromáticas, textiles de algodón, cerámica de mesa",
+    producer: 1,
     products: [
       { t: "Banco de madera de parota", e: "🪵", cat: "hogar-muebles-sillas", brand: "Sin marca", price: 1450, stock: 6 },
       { t: "Juego de 4 tazas de barro negro", e: "🍽️", cat: "hogar-cocina-vajilla", brand: "Sin marca", price: 580, stock: 25 },
@@ -455,6 +465,9 @@ const SHOPS: {
     region: "Puebla",
     description: "Cooperativa de artesanas poblanas. Cada pieza se elabora a mano; los tiempos de entrega pueden variar en temporada alta.",
     legal: "Paulina Castro Méndez", rfc: "CAMP920518TU1",
+    specialty: "velas de cera de soya, chaquira huichol y papel amate",
+    needs: "textiles bordados, empaques de cartón reciclado",
+    producer: 1,
     products: [
       { t: "Vela de cera de soya con copal", e: "🕯️", cat: "handmade-velas", brand: "Sin marca", price: 240,
         variants: [["Copal", 20], ["Lavanda", 15], ["Vainilla", 12]] },
@@ -464,7 +477,7 @@ const SHOPS: {
   },
 ];
 
-const shopRefs: { id: string; slug: string; ownerId: string; items: Created[] }[] = [];
+const shopRefs: { id: string; slug: string; ownerId: string; name: string; items: Created[] }[] = [];
 
 for (const shop of SHOPS) {
   const owner = users[shop.owner];
@@ -478,7 +491,8 @@ for (const shop of SHOPS) {
     `${pick(["55", "33", "81", "222"])}${int(1000000, 9999999)}`,
     `contacto@${slug}.mx`,
     "Aceptamos cambios por talla dentro de los 15 días naturales posteriores a la entrega.",
-    "De 2 a 5 días hábiles", shop.region, daysAgo(int(60, 240)),
+    "De 2 a 5 días hábiles", shop.region, shop.specialty, shop.needs, shop.producer,
+    daysAgo(int(60, 240)),
   );
 
   const shopItems: Created[] = [];
@@ -522,7 +536,7 @@ for (const shop of SHOPS) {
   }
   insertShopFollow.run(demoId, shopId, daysAgo(int(1, 60)));
 
-  shopRefs.push({ id: shopId, slug, ownerId: owner.id, items: shopItems });
+  shopRefs.push({ id: shopId, slug, ownerId: owner.id, name: shop.name, items: shopItems });
 }
 
 /* --------------------------------- pedidos -------------------------------- */
@@ -648,6 +662,185 @@ makeOrder(demoShopItem, demoId, "shipped", 2, {
   shopId: demoShop.id, quantity: 2, variantLabel: demoShopVariant?.label,
 });
 
+/* ====================== Red de negocios entre tiendas ====================== */
+
+const insertB2b = db.prepare("INSERT INTO b2b_prices (item_id, min_qty, price) VALUES (?,?,?)");
+const insertPartner = db.prepare(
+  `INSERT OR IGNORE INTO shop_partners (id, buyer_shop_id, supplier_shop_id, status, note, created_at, decided_at)
+   VALUES (?,?,?,?,?,?,?)`,
+);
+const insertCollective = db.prepare(
+  `INSERT INTO collectives (id, name, slug, description, emoji, region, owner_id, created_at)
+   VALUES (?,?,?,?,?,?,?,?)`,
+);
+const insertMember = db.prepare(
+  "INSERT OR IGNORE INTO collective_members (collective_id, shop_id, role, joined_at) VALUES (?,?,?,?)",
+);
+const insertBundle = db.prepare(
+  `INSERT INTO bundles (id, title, description, owner_shop_id, discount, min_price, status, created_at)
+   VALUES (?,?,?,?,?,?,'active',?)`,
+);
+const insertBundleItem = db.prepare(
+  "INSERT OR IGNORE INTO bundle_items (bundle_id, item_id, shop_id, position) VALUES (?,?,?,?)",
+);
+const insertShipment = db.prepare(
+  `INSERT INTO shipments (id, shop_id, method, region, status, tracking, pickup_date, unit_cost, total_cost, saved, created_at)
+   VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+);
+const insertAdvance = db.prepare(
+  `INSERT INTO advances (id, shop_id, user_id, amount, fee, outstanding, status, created_at)
+   VALUES (?,?,?,?,?,?,'active',?)`,
+);
+
+// 1) Precios de mayoreo: cada tienda ofrece volumen en sus productos propios
+for (const shop of shopRefs) {
+  for (const product of shop.items) {
+    if (rnd() > 0.7) continue;
+    const base = product.price;
+    insertB2b.run(product.id, 6, Math.round(base * 0.72));
+    insertB2b.run(product.id, 12, Math.round(base * 0.62));
+    if (rnd() > 0.5) insertB2b.run(product.id, 24, Math.round(base * 0.55));
+  }
+}
+
+// 2) Relaciones de mayoreo entre tiendas (aprobadas y pendientes)
+const [xanath, tecno, casaSol, tonantzin] = shopRefs;
+const partnerPairs: [string, string, string, string][] = [
+  [xanath.id, tonantzin.id, "approved", "Queremos incluir sus velas en nuestros paquetes de regalo."],
+  [casaSol.id, tonantzin.id, "approved", "Buscamos velas y cerámica para acompañar nuestros muebles."],
+  [tonantzin.id, xanath.id, "approved", "Nos interesan sus textiles bordados para nuestra tienda física."],
+  [tecno.id, tonantzin.id, "pending", "Queremos surtir papelería artesanal para la temporada navideña."],
+];
+for (const [buyer, supplier, status, note] of partnerPairs) {
+  insertPartner.run(id("pa_"), buyer, supplier, status, note, daysAgo(int(10, 90)),
+    status === "pending" ? null : daysAgo(int(1, 9)));
+}
+
+// 3) Pedidos de mayoreo ya surtidos + reventa con crédito al taller
+const tonantzinVela = tonantzin.items[0];
+const wholesaleOrderId = id("o_");
+{
+  const qty = 12;
+  const unit = Math.round(tonantzinVela.price * 0.62);
+  const fee = Math.round(unit * qty * 0.05);
+  const buyerShop = casaSol;
+  const buyerUser = users.find((u) => u.id === buyerShop.ownerId)!;
+  const createdAt = daysAgo(18);
+  insertOrder.run(
+    wholesaleOrderId, tonantzinVela.id, buyerShop.ownerId, tonantzin.ownerId, unit, 0, null, 0,
+    unit * qty, fee, 0, unit * qty - fee, "balance", "done",
+    buyerUser.name, "64000", "Nuevo León", "Monterrey", "Av. Constitución 450, Col. Centro",
+    "8112345678", `MD${int(1000000000, 9999999999)}MX`, createdAt, daysAgo(17), daysAgo(15), daysAgo(15),
+  );
+  db.prepare("UPDATE orders SET is_wholesale = 1, quantity = ?, shop_id = ? WHERE id = ?")
+    .run(qty, tonantzin.id, wholesaleOrderId);
+  db.prepare("UPDATE items SET stock = MAX(stock - ?, 0) WHERE id = ?").run(qty, tonantzinVela.id);
+  insertMessage.run(id("ms_"), wholesaleOrderId, buyerShop.ownerId,
+    `Pedido de mayoreo de ${buyerShop.name}: ${qty} piezas. ¿Nos pueden facturar?`, createdAt);
+  insertMessage.run(id("ms_"), wholesaleOrderId, tonantzin.ownerId,
+    "¡Claro! Les mando el CFDI junto con la guía. Gracias por el pedido 🙌",
+    new Date(new Date(createdAt).getTime() + 7200000).toISOString());
+
+  // Casa Sol revende la vela con crédito a Tonantzin
+  const resoldId = id("m");
+  const resalePrice = Math.round(tonantzinVela.price * 1.15);
+  db.prepare(
+    `INSERT INTO items (id, seller_id, title, description, price, category_id, brand_id, size, color,
+      condition, shipping_payer, shipping_method, ship_from, ship_days, offers_enabled, shop_id,
+      stock, external_sku, origin, source_shop_id, source_item_id, status, views, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,'',?,1,'seller','comodo',?,1,0,?,?,'','sourced',?,?, 'on_sale',?,?,?)`,
+  ).run(
+    resoldId, buyerShop.ownerId, `${tonantzinVela.title} · selección Casa Sol`,
+    `Vela artesanal seleccionada para acompañar nuestros muebles.\n\nProducto elaborado por ${tonantzin.name} y surtido por ${casaSol.name}.`,
+    resalePrice, catIdBySlug.get("hogar-decoracion")!, brandIdByName.get("Sin marca")!, "Natural",
+    "Nuevo León", casaSol.id, 12, tonantzin.id, tonantzinVela.id, int(30, 400), daysAgo(14), daysAgo(14),
+  );
+  insertImage.run(resoldId, `/api/photo?seed=${encodeURIComponent(resoldId)}&e=%F0%9F%95%AF%EF%B8%8F&t=${encodeURIComponent("Vela artesanal")}`, 0);
+}
+
+// 4) Colectivos
+const collectives: [string, string, string, string, string, number][] = [
+  ["Mercado de Artesanas de Puebla", "mercado-artesanas-puebla",
+   "Cooperativas y talleres familiares de Puebla que venden juntas en línea desde 2024.",
+   "🧵", "Puebla", 3],
+  ["Corredor Roma-Condesa", "corredor-roma-condesa",
+   "Tiendas de barrio de la Roma y la Condesa que comparten mensajería y escaparate.",
+   "🏙️", "Ciudad de México", 0],
+];
+const collectiveIds: string[] = [];
+for (const [name, slug, description, emoji, region, ownerIndex] of collectives) {
+  const collectiveId = id("co_");
+  const owner = shopRefs[ownerIndex];
+  insertCollective.run(collectiveId, name, slug, description, emoji, region, owner.ownerId, daysAgo(int(40, 150)));
+  insertMember.run(collectiveId, owner.id, "owner", daysAgo(int(30, 140)));
+  collectiveIds.push(collectiveId);
+}
+insertMember.run(collectiveIds[0], xanath.id, "member", daysAgo(30));
+insertMember.run(collectiveIds[0], casaSol.id, "member", daysAgo(22));
+insertMember.run(collectiveIds[1], tecno.id, "member", daysAgo(18));
+insertMember.run(collectiveIds[1], tonantzin.id, "member", daysAgo(12));
+
+// 5) Paquete cruzado entre dos tiendas
+{
+  const bundleId = id("bu_");
+  const textil = xanath.items[0];
+  const vela = tonantzin.items[0];
+  insertBundle.run(bundleId, "Ritual de casa: textil y vela",
+    "Un textil bordado a mano y una vela de cera de soya, de dos talleres aliados.",
+    xanath.id, 100, Math.min(textil.price, vela.price), daysAgo(20));
+  insertBundleItem.run(bundleId, textil.id, xanath.id, 0);
+  insertBundleItem.run(bundleId, vela.id, tonantzin.id, 1);
+}
+
+// 5.b) Pedidos pagados pendientes de envío (para consolidar y para el adelanto)
+for (const [shop, count] of [[xanath, 3], [tonantzin, 3]] as const) {
+  for (let i = 0; i < count; i++) {
+    const product = shop.items[i % shop.items.length];
+    const buyer = users[(i + 3) % users.length];
+    if (buyer.id === shop.ownerId) continue;
+    const variantRow = db.prepare(
+      "SELECT label FROM item_variants WHERE item_id = ? AND stock > 0 LIMIT 1",
+    ).get(product.id) as { label: string } | undefined;
+    makeOrder(product, buyer.id, "paid", int(1, 5), {
+      shopId: shop.id, quantity: int(1, 2), variantLabel: variantRow?.label,
+    });
+  }
+}
+
+// 6) Envío consolidado de una tienda
+{
+  const shipmentId = id("sp_");
+  const pending = db.prepare(
+    "SELECT id FROM orders WHERE shop_id = ? AND status = 'paid' LIMIT 3",
+  ).all(xanath.id) as { id: string }[];
+  if (pending.length >= 2) {
+    insertShipment.run(shipmentId, xanath.id, "comodo", "Ciudad de México", "open", "",
+      new Date(Date.now() + 864e5).toISOString().slice(0, 10), 65, 65 * pending.length,
+      Math.max(0, (99 - 65) * pending.length), daysAgo(1));
+    for (const order of pending) {
+      db.prepare("UPDATE orders SET shipment_id = ? WHERE id = ?").run(shipmentId, order.id);
+    }
+  }
+}
+
+// 7) Adelanto de ventas activo
+{
+  const pendingTotal = (db.prepare(
+    "SELECT COALESCE(SUM(payout), 0) AS total FROM orders WHERE shop_id = ? AND status IN ('paid','shipped','received')",
+  ).get(tonantzin.id) as { total: number }).total;
+  const amount = Math.min(
+    Math.floor(pendingTotal * 0.7),
+    Math.max(500, Math.round((pendingTotal * 0.4) / 100) * 100),
+  );
+  if (amount >= 500) {
+    const fee = Math.round(amount * 0.05);
+    insertAdvance.run(id("ad_"), tonantzin.id, tonantzin.ownerId, amount, fee, amount + fee, daysAgo(6));
+    insertLedger.run(id("l_"), tonantzin.ownerId, "balance", amount,
+      `Adelanto sobre ventas en curso (comisión $${fee})`, daysAgo(6));
+    db.prepare("UPDATE users SET balance = balance + ? WHERE id = ?").run(amount, tonantzin.ownerId);
+  }
+}
+
 /* ------------------------- cupones, puntos y avisos ------------------------ */
 
 const insertCoupon = db.prepare(
@@ -682,7 +875,7 @@ const count = (table: string) =>
   (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
 
 console.log("Base de datos creada en", DB_PATH);
-for (const table of ["users", "categories", "brands", "items", "item_images", "likes", "comments", "orders", "messages", "reviews", "follows", "notifications", "coupons", "shops", "item_variants", "shop_follows"]) {
+for (const table of ["users", "categories", "brands", "items", "item_images", "likes", "comments", "orders", "messages", "reviews", "follows", "notifications", "coupons", "shops", "item_variants", "shop_follows", "b2b_prices", "shop_partners", "collectives", "collective_members", "bundles", "shipments", "advances"]) {
   console.log(` · ${table}: ${count(table)}`);
 }
 console.log("\nCuenta de demostración: demo@mercado.mx / demo1234");

@@ -17,6 +17,10 @@ import {
   shopById,
   shopRating,
   isFollowingShop,
+  bundlesForItem,
+  bundleItems,
+  b2bPricesOf,
+  sourceOf,
   userById,
   variantsOf,
 } from "@/lib/queries";
@@ -84,6 +88,9 @@ export default async function ItemPage({
   const availableStock = variants.length
     ? variants.reduce((sum, v) => sum + v.stock, 0)
     : item.stock;
+  const provenance = sourceOf(item);
+  const wholesaleTiers = shop ? b2bPricesOf(item.id) : [];
+  const bundles = bundlesForItem(item.id);
 
   // registro de visita e historial
   run("UPDATE items SET views = views + 1 WHERE id = ?", [item.id]);
@@ -131,6 +138,15 @@ export default async function ItemPage({
             : []),
           ["Vendido por", <Link key="shop" href={`/shop/${shop.slug}`} className="link">{shop.name} (Mercado Shops)</Link>],
           ["Devoluciones", shop.return_policy || "Según la Ley Federal de Protección al Consumidor."],
+          ...(provenance
+            ? ([[
+                "Elaborado por",
+                <Link key="origen" href={`/shop/${provenance.shop.slug}`} className="link">
+                  {provenance.shop.name}
+                  {provenance.shop.specialty ? ` · ${provenance.shop.specialty}` : ""}
+                </Link>,
+              ]] as [string, React.ReactNode][])
+            : []),
         ] as [string, React.ReactNode][])
       : []),
   ];
@@ -262,6 +278,27 @@ export default async function ItemPage({
               </div>
             ))}
           </dl>
+
+          {wholesaleTiers.length > 0 && (
+            <div className="card mt-4 p-4">
+              <h2 className="section-title">También en mayoreo</h2>
+              <p className="mt-1 text-xs text-muted">
+                Si tienes una tienda en Mercado puedes surtirte de este producto por volumen.
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {wholesaleTiers.map((tier) => (
+                  <li key={tier.id} className="chip">
+                    {tier.min_qty}+ pza · <span className="font-black">{money(tier.price)}</span>
+                  </li>
+                ))}
+              </ul>
+              {shop && (
+                <Link href={`/mayoreo/${shop.slug}`} className="btn-outline mt-3 w-full">
+                  Ver catálogo de mayoreo
+                </Link>
+              )}
+            </div>
+          )}
 
           <div className="mt-6">
             <h2 className="section-title">Descripción</h2>
@@ -427,6 +464,20 @@ export default async function ItemPage({
           <ItemRow items={sellerItems} />
         </Section>
       )}
+
+      {bundles.map((bundle) => {
+        const partners = bundleItems(bundle.id).filter((other) => other.id !== item.id);
+        if (!partners.length) return null;
+        return (
+          <Section
+            key={bundle.id}
+            title={`Paquete «${bundle.title}»`}
+            subtitle={`Compra este producto y recibe un cupón de ${money(bundle.discount)} para estas tiendas`}
+          >
+            <ItemRow items={partners} />
+          </Section>
+        );
+      })}
 
       {related.length > 0 && (
         <Section title="Artículos parecidos">

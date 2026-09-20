@@ -390,3 +390,44 @@ export function paymentLabel(value: string): string {
 export function businessTypeLabel(value: string): string {
   return BUSINESS_TYPES.find((b) => b.value === value)?.label ?? value;
 }
+
+/* ---------------------- Red de negocios (B2B y colectivos) ------------------- */
+
+/** Comisión de Mercado en las ventas de mayoreo entre tiendas. */
+export const B2B_FEE_RATE = 0.05;
+/** Piezas mínimas para poder comprar en mayoreo. */
+export const B2B_MIN_QTY = 3;
+
+/** Costo por paquete dentro de un envío consolidado, por método. */
+export const CONSOLIDATED_UNIT_COST: Record<string, number> = {
+  facil: 49,
+  comodo: 65,
+  paqueteria: 59,
+};
+
+/** Adelanto de saldo sobre ventas en curso. */
+export const ADVANCE_FEE_RATE = 0.05;
+export const ADVANCE_MAX_RATE = 0.7;
+export const ADVANCE_MIN = 500;
+
+export const PARTNER_STATUS: Record<string, { label: string; className: string }> = {
+  pending: { label: "Solicitud enviada", className: "bg-canvas text-muted" },
+  approved: { label: "Aprobada", className: "bg-brand-soft text-brand-darker" },
+  rejected: { label: "Rechazada", className: "bg-red-50 text-red-600" },
+};
+
+export const SHIPMENT_STATUS: Record<string, { label: string; className: string }> = {
+  open: { label: "En preparación", className: "bg-canvas text-muted" },
+  picked_up: { label: "Recolectado", className: "bg-brand-soft text-brand-darker" },
+  closed: { label: "Entregado", className: "bg-canvas text-muted" },
+};
+
+export const CSV_TEMPLATE_HEADERS = [
+  "sku", "titulo", "descripcion", "precio", "inventario", "categoria",
+  "marca", "talla", "color", "variantes",
+] as const;
+
+export const CSV_TEMPLATE_EXAMPLE =
+  "sku,titulo,descripcion,precio,inventario,categoria,marca,talla,color,variantes\n" +
+  "BLU-001,Blusa de manta bordada,Bordada a mano en Puebla,690,18,mujer-blusas,Sin marca,M,Blanco,Talla CH:6|Talla M:8|Talla G:4\n" +
+  "VEL-010,Vela de soya con copal,Cera de soya 100%,240,40,handmade-velas,Sin marca,,Natural,\n";

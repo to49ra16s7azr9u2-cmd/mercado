@@ -13,6 +13,8 @@ const COLUMNS = [
       { href: "/brands", label: "Marcas" },
       { href: "/shops", label: "Mercado Shops" },
       { href: "/mypage/shop/new", label: "Vender como negocio" },
+      { href: "/mayoreo", label: "Mayoreo entre tiendas" },
+      { href: "/colectivos", label: "Colectivos" },
     ],
   },
   {

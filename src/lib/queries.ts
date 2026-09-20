@@ -1,6 +1,9 @@
 import "server-only";
 import { all, get } from "./db";
-import type { Category, Comment, Item, ItemCard, Notification, Order, Shop, User, Variant } from "./types";
+import type {
+  Advance, B2bPrice, Bundle, Category, Collective, Comment, Item, ItemCard, Notification,
+  Order, Shipment, Shop, ShopPartner, User, Variant,
+} from "./types";
 
 /* ---------------------------------- categorías --------------------------------- */
 
@@ -613,4 +616,366 @@ export function categoryTree(): CategoryTreeNode[] {
   const build = (parent: number | null): CategoryTreeNode[] =>
     (byParent.get(parent) ?? []).map((c) => ({ id: c.id, name: c.name, children: build(c.id) }));
   return build(null);
+}
+
+
+/* ======================= Red de negocios: mayoreo (B2B) ====================== */
+
+export function b2bPricesOf(itemId: string): B2bPrice[] {
+  return all<B2bPrice>("SELECT * FROM b2b_prices WHERE item_id = ? ORDER BY min_qty", [itemId]);
+}
+
+export function b2bPriceFor(itemId: string, quantity: number): number | null {
+  const tier = get<{ price: number }>(
+    "SELECT price FROM b2b_prices WHERE item_id = ? AND min_qty <= ? ORDER BY min_qty DESC LIMIT 1",
+    [itemId, quantity],
+  );
+  return tier?.price ?? null;
+}
+
+export function hasWholesale(itemId: string): boolean {
+  return !!get("SELECT 1 AS x FROM b2b_prices WHERE item_id = ?", [itemId]);
+}
+
+export function partnerBetween(buyerShopId: string, supplierShopId: string): ShopPartner | undefined {
+  return get<ShopPartner>(
+    "SELECT * FROM shop_partners WHERE buyer_shop_id = ? AND supplier_shop_id = ?",
+    [buyerShopId, supplierShopId],
+  );
+}
+
+export type PartnerRow = ShopPartner & {
+  shop_name: string; shop_slug: string; shop_emoji: string; shop_category: string; shop_region: string;
+};
+
+export function partnerRequestsFor(supplierShopId: string): PartnerRow[] {
+  return all<PartnerRow>(
+    `SELECT p.*, s.name AS shop_name, s.slug AS shop_slug, s.cover_emoji AS shop_emoji,
+            s.category AS shop_category, s.ship_from AS shop_region
+     FROM shop_partners p JOIN shops s ON s.id = p.buyer_shop_id
+     WHERE p.supplier_shop_id = ? ORDER BY p.created_at DESC`,
+    [supplierShopId],
+  );
+}
+
+export function partnershipsOf(buyerShopId: string): PartnerRow[] {
+  return all<PartnerRow>(
+    `SELECT p.*, s.name AS shop_name, s.slug AS shop_slug, s.cover_emoji AS shop_emoji,
+            s.category AS shop_category, s.ship_from AS shop_region
+     FROM shop_partners p JOIN shops s ON s.id = p.supplier_shop_id
+     WHERE p.buyer_shop_id = ? ORDER BY p.created_at DESC`,
+    [buyerShopId],
+  );
+}
+
+/** Tiendas que ofrecen catálogo de mayoreo. */
+export function supplierShops(q?: string, category?: string) {
+  const where = ["s.status = 'active'", "EXISTS (SELECT 1 FROM items i JOIN b2b_prices b ON b.item_id = i.id WHERE i.shop_id = s.id AND i.status = 'on_sale')"];
+  const params: Array<string | number> = [];
+  if (q) {
+    where.push("(s.name LIKE ? OR s.description LIKE ?)");
+    params.push(`%${q}%`, `%${q}%`);
+  }
+  if (category) {
+    where.push("s.category = ?");
+    params.push(category);
+  }
+  return all<Shop & { products: number; min_price: number }>(
+    `SELECT s.*,
+       (SELECT COUNT(*) FROM items i JOIN b2b_prices b ON b.item_id = i.id
+        WHERE i.shop_id = s.id AND i.status = 'on_sale') AS products,
+       (SELECT MIN(b.price) FROM items i JOIN b2b_prices b ON b.item_id = i.id
+        WHERE i.shop_id = s.id AND i.status = 'on_sale') AS min_price
+     FROM shops s WHERE ${where.join(" AND ")} ORDER BY products DESC, s.name`,
+    params,
+  );
+}
+
+export function wholesaleCatalog(shopId: string): (ItemCard & { tiers: B2bPrice[] })[] {
+  const items = all<ItemCard>(
+    `${CARD_SELECT} WHERE i.shop_id = ? AND i.status = 'on_sale'
+       AND EXISTS (SELECT 1 FROM b2b_prices b WHERE b.item_id = i.id)
+     ORDER BY i.updated_at DESC`,
+    [shopId],
+  );
+  return items.map((item) => ({ ...item, tiers: b2bPricesOf(item.id) }));
+}
+
+export function wholesaleOrdersOf(shopId: string, role: "buyer" | "supplier"): OrderRow[] {
+  const clause = role === "supplier" ? "o.shop_id = ?" : "o.buyer_id IN (SELECT owner_id FROM shops WHERE id = ?)";
+  return all<OrderRow>(
+    `${ORDER_SELECT} WHERE ${clause} AND o.is_wholesale = 1 ORDER BY o.created_at DESC`,
+    [shopId],
+  );
+}
+
+/* ========================== Envíos consolidados ============================= */
+
+export function shipmentsOf(shopId: string): (Shipment & { orders: number })[] {
+  return all<Shipment & { orders: number }>(
+    `SELECT s.*, (SELECT COUNT(*) FROM orders o WHERE o.shipment_id = s.id) AS orders
+     FROM shipments s WHERE s.shop_id = ? ORDER BY s.created_at DESC`,
+    [shopId],
+  );
+}
+
+export function shipmentById(id: string): Shipment | undefined {
+  return get<Shipment>("SELECT * FROM shipments WHERE id = ?", [id]);
+}
+
+export function ordersInShipment(shipmentId: string): OrderRow[] {
+  return all<OrderRow>(`${ORDER_SELECT} WHERE o.shipment_id = ? ORDER BY o.created_at`, [shipmentId]);
+}
+
+/** Pedidos pagados de la tienda que todavía no están en ningún envío. */
+export function consolidatableOrders(shopId: string): OrderRow[] {
+  return all<OrderRow>(
+    `${ORDER_SELECT} WHERE o.shop_id = ? AND o.status = 'paid' AND (o.shipment_id IS NULL OR o.shipment_id = '')
+     ORDER BY o.ship_region, o.created_at`,
+    [shopId],
+  );
+}
+
+/* ================================ Colectivos =============================== */
+
+export function allCollectives(): (Collective & { members: number; products: number })[] {
+  return all<Collective & { members: number; products: number }>(
+    `SELECT c.*,
+       (SELECT COUNT(*) FROM collective_members m WHERE m.collective_id = c.id) AS members,
+       (SELECT COUNT(*) FROM items i WHERE i.status = 'on_sale' AND i.shop_id IN
+          (SELECT shop_id FROM collective_members WHERE collective_id = c.id)) AS products
+     FROM collectives c ORDER BY members DESC, c.created_at DESC`,
+  );
+}
+
+export function collectiveBySlug(slug: string): Collective | undefined {
+  return get<Collective>("SELECT * FROM collectives WHERE slug = ?", [slug]);
+}
+
+export function collectiveMembers(collectiveId: string) {
+  return all<Shop & { role: string; joined_at: string; products: number }>(
+    `SELECT s.*, m.role, m.joined_at,
+       (SELECT COUNT(*) FROM items i WHERE i.shop_id = s.id AND i.status = 'on_sale') AS products
+     FROM collective_members m JOIN shops s ON s.id = m.shop_id
+     WHERE m.collective_id = ? ORDER BY m.role, s.name`,
+    [collectiveId],
+  );
+}
+
+export function collectiveItems(collectiveId: string, limit = 24): ItemCard[] {
+  return all<ItemCard>(
+    `${CARD_SELECT} WHERE i.status = 'on_sale' AND i.shop_id IN
+       (SELECT shop_id FROM collective_members WHERE collective_id = ?)
+     ORDER BY i.created_at DESC LIMIT ?`,
+    [collectiveId, limit],
+  );
+}
+
+export function collectivesOfShop(shopId: string): (Collective & { role: string })[] {
+  return all<Collective & { role: string }>(
+    `SELECT c.*, m.role FROM collective_members m JOIN collectives c ON c.id = m.collective_id
+     WHERE m.shop_id = ? ORDER BY m.joined_at DESC`,
+    [shopId],
+  );
+}
+
+export function isCollectiveMember(collectiveId: string, shopId: string): boolean {
+  return !!get("SELECT 1 AS x FROM collective_members WHERE collective_id = ? AND shop_id = ?",
+    [collectiveId, shopId]);
+}
+
+/* ============================ Paquetes cruzados ============================= */
+
+export type BundleRow = Bundle & { shop_name: string; shop_slug: string; shops: number };
+
+export function bundlesOfShop(shopId: string): BundleRow[] {
+  return all<BundleRow>(
+    `SELECT b.*, s.name AS shop_name, s.slug AS shop_slug,
+       (SELECT COUNT(DISTINCT bi.shop_id) FROM bundle_items bi WHERE bi.bundle_id = b.id) AS shops
+     FROM bundles b JOIN shops s ON s.id = b.owner_shop_id
+     WHERE b.owner_shop_id = ? OR b.id IN (SELECT bundle_id FROM bundle_items WHERE shop_id = ?)
+     ORDER BY b.created_at DESC`,
+    [shopId, shopId],
+  );
+}
+
+export function activeBundles(limit = 8): BundleRow[] {
+  return all<BundleRow>(
+    `SELECT b.*, s.name AS shop_name, s.slug AS shop_slug,
+       (SELECT COUNT(DISTINCT bi.shop_id) FROM bundle_items bi WHERE bi.bundle_id = b.id) AS shops
+     FROM bundles b JOIN shops s ON s.id = b.owner_shop_id
+     WHERE b.status = 'active' ORDER BY b.created_at DESC LIMIT ?`,
+    [limit],
+  );
+}
+
+export function bundleById(id: string): BundleRow | undefined {
+  return get<BundleRow>(
+    `SELECT b.*, s.name AS shop_name, s.slug AS shop_slug,
+       (SELECT COUNT(DISTINCT bi.shop_id) FROM bundle_items bi WHERE bi.bundle_id = b.id) AS shops
+     FROM bundles b JOIN shops s ON s.id = b.owner_shop_id WHERE b.id = ?`,
+    [id],
+  );
+}
+
+export function bundleItems(bundleId: string): ItemCard[] {
+  return all<ItemCard>(
+    `${CARD_SELECT} JOIN bundle_items bi ON bi.item_id = i.id
+     WHERE bi.bundle_id = ? ORDER BY bi.position`,
+    [bundleId],
+  );
+}
+
+/** Paquetes en los que participa un artículo (para la venta cruzada en su ficha). */
+export function bundlesForItem(itemId: string): BundleRow[] {
+  return all<BundleRow>(
+    `SELECT b.*, s.name AS shop_name, s.slug AS shop_slug,
+       (SELECT COUNT(DISTINCT bi2.shop_id) FROM bundle_items bi2 WHERE bi2.bundle_id = b.id) AS shops
+     FROM bundle_items bi
+     JOIN bundles b ON b.id = bi.bundle_id
+     JOIN shops s ON s.id = b.owner_shop_id
+     WHERE bi.item_id = ? AND b.status = 'active'`,
+    [itemId],
+  );
+}
+
+/* ========================= Adelanto de saldo (factoraje) ==================== */
+
+export function pendingSales(shopId: string) {
+  const row = get<{ total: number; orders: number }>(
+    `SELECT COALESCE(SUM(payout), 0) AS total, COUNT(*) AS orders
+     FROM orders WHERE shop_id = ? AND status IN ('paid', 'shipped', 'received')`,
+    [shopId],
+  );
+  return { total: row?.total ?? 0, orders: row?.orders ?? 0 };
+}
+
+export function advancesOf(shopId: string): Advance[] {
+  return all<Advance>("SELECT * FROM advances WHERE shop_id = ? ORDER BY created_at DESC", [shopId]);
+}
+
+export function activeAdvance(shopId: string): Advance | undefined {
+  return get<Advance>(
+    "SELECT * FROM advances WHERE shop_id = ? AND status = 'active' ORDER BY created_at LIMIT 1",
+    [shopId],
+  );
+}
+
+/* ============================ Importación de catálogo ====================== */
+
+export function importJobsOf(shopId: string) {
+  return all<{
+    id: string; filename: string; created: number; updated: number;
+    skipped: number; errors: string; created_at: string;
+  }>("SELECT * FROM import_jobs WHERE shop_id = ? ORDER BY created_at DESC LIMIT 20", [shopId]);
+}
+
+/** Productos de tiendas aliadas: socias de mayoreo (en cualquier sentido) o del mismo colectivo. */
+export function alliedShopItems(shopId: string, limit = 60) {
+  return all<{ id: string; title: string; price: number; shop: string; shop_slug: string }>(
+    `SELECT i.id, i.title, i.price, s.name AS shop, s.slug AS shop_slug
+     FROM items i JOIN shops s ON s.id = i.shop_id
+     WHERE i.status = 'on_sale' AND i.shop_id != ? AND s.status = 'active' AND i.shop_id IN (
+       SELECT supplier_shop_id FROM shop_partners WHERE buyer_shop_id = ? AND status = 'approved'
+       UNION
+       SELECT buyer_shop_id FROM shop_partners WHERE supplier_shop_id = ? AND status = 'approved'
+       UNION
+       SELECT shop_id FROM collective_members WHERE collective_id IN
+         (SELECT collective_id FROM collective_members WHERE shop_id = ?)
+     )
+     ORDER BY i.created_at DESC LIMIT ?`,
+    [shopId, shopId, shopId, shopId, limit],
+  );
+}
+
+/* ===================== Especialización: producir vs. surtir ================= */
+
+function keywords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .split(/[^a-z0-9ñ]+/)
+    .filter((word) => word.length > 3)
+    .slice(0, 8);
+}
+
+/** Proveedores cuya especialidad coincide con lo que esta tienda quiere surtir. */
+export function suppliersForNeeds(shop: Shop, limit = 6) {
+  const words = keywords(shop.sourcing_needs);
+  if (!words.length) return [];
+  const like = words.map(() => "(LOWER(s.specialty) LIKE ? OR LOWER(s.category) LIKE ? OR LOWER(s.description) LIKE ?)");
+  const params: string[] = [];
+  for (const word of words) params.push(`%${word}%`, `%${word}%`, `%${word}%`);
+  return all<Shop & { products: number; matched: number }>(
+    `SELECT s.*,
+       (SELECT COUNT(*) FROM items i JOIN b2b_prices b ON b.item_id = i.id
+        WHERE i.shop_id = s.id AND i.status = 'on_sale') AS products,
+       1 AS matched
+     FROM shops s
+     WHERE s.status = 'active' AND s.id != ? AND (${like.join(" OR ")})
+     ORDER BY products DESC LIMIT ?`,
+    [shop.id, ...params, limit],
+  );
+}
+
+/** Tiendas que buscan surtirse de lo que esta tienda produce. */
+export function buyersForSpecialty(shop: Shop, limit = 6) {
+  const words = keywords(`${shop.specialty} ${shop.category}`);
+  if (!words.length) return [];
+  const like = words.map(() => "LOWER(s.sourcing_needs) LIKE ?");
+  const params = words.map((word) => `%${word}%`);
+  return all<Shop & { products: number }>(
+    `SELECT s.*,
+       (SELECT COUNT(*) FROM items i WHERE i.shop_id = s.id AND i.status = 'on_sale') AS products
+     FROM shops s
+     WHERE s.status = 'active' AND s.id != ? AND s.sourcing_needs != '' AND (${like.join(" OR ")})
+     ORDER BY products DESC LIMIT ?`,
+    [shop.id, ...params, limit],
+  );
+}
+
+/** Mezcla del catálogo: cuánto produce la tienda y cuánto surte de otras. */
+export function specializationMix(shopId: string) {
+  const row = get<{ own: number; sourced: number; sourced_shops: number }>(
+    `SELECT
+       SUM(CASE WHEN origin = 'own' THEN 1 ELSE 0 END) AS own,
+       SUM(CASE WHEN origin = 'sourced' THEN 1 ELSE 0 END) AS sourced,
+       COUNT(DISTINCT source_shop_id) AS sourced_shops
+     FROM items WHERE shop_id = ? AND status IN ('on_sale', 'stopped', 'trading', 'sold')`,
+    [shopId],
+  );
+  const own = row?.own ?? 0;
+  const sourced = row?.sourced ?? 0;
+  const total = own + sourced;
+  return {
+    own,
+    sourced,
+    total,
+    shops: row?.sourced_shops ?? 0,
+    ownShare: total ? Math.round((own / total) * 100) : 0,
+  };
+}
+
+/** Pedidos de mayoreo recibidos que todavía no se publican en la tienda compradora. */
+export function sourcedOrdersToList(shopId: string, buyerUserId: string) {
+  return all<OrderRow & { listed: number }>(
+    `${ORDER_SELECT}
+     WHERE o.is_wholesale = 1 AND o.buyer_id = ? AND o.status IN ('shipped', 'received', 'done')
+       AND NOT EXISTS (
+         SELECT 1 FROM items x WHERE x.shop_id = ? AND x.source_item_id = o.item_id
+       )
+     ORDER BY o.created_at DESC`,
+    [buyerUserId, shopId],
+  ).map((order) => ({ ...order, listed: 0 }));
+}
+
+export function sourceOf(item: Item) {
+  if (!item.source_shop_id) return undefined;
+  const shop = get<Shop>("SELECT * FROM shops WHERE id = ?", [item.source_shop_id]);
+  if (!shop) return undefined;
+  const original = item.source_item_id
+    ? get<{ id: string; title: string }>("SELECT id, title FROM items WHERE id = ?", [item.source_item_id])
+    : undefined;
+  return { shop, original };
 }

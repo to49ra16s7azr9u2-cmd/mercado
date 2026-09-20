@@ -26,7 +26,20 @@ const GROUPS = [
       { href: "/mypage/shop", label: "Mi tienda", icon: "🏪" },
       { href: "/mypage/shop/items", label: "Inventario", icon: "📦" },
       { href: "/mypage/shop/orders", label: "Pedidos de la tienda", icon: "🧾" },
+      { href: "/mypage/shop/shipments", label: "Envíos consolidados", icon: "🚚" },
+      { href: "/mypage/shop/import", label: "Importar catálogo", icon: "📤" },
       { href: "/mypage/shops", label: "Tiendas que sigo", icon: "💚" },
+    ],
+  },
+  {
+    title: "Red de negocios",
+    links: [
+      { href: "/mypage/shop/wholesale", label: "Mayoreo (proveedora)", icon: "🏷️" },
+      { href: "/mypage/shop/partners", label: "Mis proveedores", icon: "🤝" },
+      { href: "/mypage/shop/purchases", label: "Compras de mayoreo", icon: "📥" },
+      { href: "/mypage/shop/collectives", label: "Mis colectivos", icon: "🏛️" },
+      { href: "/mypage/shop/bundles", label: "Paquetes cruzados", icon: "🎁" },
+      { href: "/mypage/shop/financing", label: "Adelanto de ventas", icon: "⚡" },
     ],
   },
   {

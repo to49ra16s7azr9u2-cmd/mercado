@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { shopOfUser, shopStats, shopOrders } from "@/lib/queries";
-import { reviewShopAction } from "@/lib/actions";
+import {
+  buyersForSpecialty, shopOfUser, shopOrders, shopStats, sourcedOrdersToList,
+  specializationMix, suppliersForNeeds,
+} from "@/lib/queries";
+import { listSourcedItemAction, reviewShopAction } from "@/lib/actions";
+import { SourcedListingForm } from "@/components/NetworkForms";
 import { SubmitButton } from "@/components/SubmitButton";
 import { SHOP_STATUS } from "@/lib/constants";
 import { money, shortDate } from "@/lib/format";
@@ -51,6 +55,10 @@ export default async function ShopDashboardPage() {
   const stats = shopStats(shop.id);
   const orders = shopOrders(shop.id).slice(0, 5);
   const status = SHOP_STATUS[shop.status];
+  const mix = specializationMix(shop.id);
+  const suppliers = suppliersForNeeds(shop);
+  const buyers = buyersForSpecialty(shop);
+  const toList = sourcedOrdersToList(shop.id, user.id);
 
   return (
     <>
@@ -95,8 +103,125 @@ export default async function ShopDashboardPage() {
         <Link href="/mypage/shop/items/new" className="btn-primary">Publicar producto</Link>
         <Link href="/mypage/shop/items" className="btn-outline">Inventario</Link>
         <Link href="/mypage/shop/orders" className="btn-outline">Pedidos</Link>
+        <Link href="/mypage/shop/shipments" className="btn-outline">Envíos consolidados</Link>
+        <Link href="/mypage/shop/wholesale" className="btn-outline">Mayoreo</Link>
+        <Link href="/mypage/shop/import" className="btn-outline">Importar catálogo</Link>
         <Link href="/mypage/shop/settings" className="btn-outline">Configuración</Link>
       </div>
+
+      <section className="mt-6">
+        <h2 className="section-title">Tu especialización</h2>
+        <div className="card mt-2 p-4">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-sm">
+                {mix.total === 0
+                  ? "Publica productos para ver la mezcla de tu catálogo."
+                  : `${mix.ownShare} % de tu catálogo lo produces tú; el resto lo surtes con ${mix.shops} tienda${mix.shops === 1 ? "" : "s"} aliada${mix.shops === 1 ? "" : "s"}.`}
+              </p>
+              {shop.specialty && (
+                <p className="mt-1 text-xs text-muted">Especialidad: {shop.specialty}</p>
+              )}
+            </div>
+            <Link href="/mypage/shop/settings" className="shrink-0 text-xs font-bold text-brand-darker">
+              Editar especialidad →
+            </Link>
+          </div>
+          {mix.total > 0 && (
+            <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-canvas">
+              <span className="bg-brand" style={{ width: `${mix.ownShare}%` }} title={`Producción propia: ${mix.own}`} />
+              <span className="bg-brand-tint" style={{ width: `${100 - mix.ownShare}%` }} title={`Surtido: ${mix.sourced}`} />
+            </div>
+          )}
+          <p className="mt-2 text-[11px] text-muted">
+            {mix.own} productos propios · {mix.sourced} surtidos con otras tiendas
+          </p>
+        </div>
+      </section>
+
+      {toList.length > 0 && (
+        <section className="mt-6">
+          <h2 className="section-title">Mercancía surtida lista para publicar</h2>
+          <p className="mt-1 text-xs text-muted">
+            Compraste estas piezas en mayoreo. Publícalas en tu tienda: el crédito de elaboración
+            queda con quien las produce.
+          </p>
+          <ul className="card mt-2 divide-y divide-line">
+            {toList.map((order) => (
+              <li key={order.id} className="p-4">
+                <div className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={order.image ?? ""} alt="" className="h-12 w-12 rounded-lg object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold">{order.title}</p>
+                    <p className="text-xs text-muted">
+                      {order.quantity} piezas · {money(order.price)} c/u · de {order.seller_name}
+                    </p>
+                  </div>
+                </div>
+                <SourcedListingForm
+                  action={listSourcedItemAction}
+                  order={{
+                    id: order.id,
+                    title: order.title,
+                    cost: order.price,
+                    quantity: order.quantity,
+                    supplier: order.seller_name,
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(suppliers.length > 0 || buyers.length > 0) && (
+        <section className="mt-6">
+          <h2 className="section-title">Conexiones sugeridas</h2>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            {suppliers.length > 0 && (
+              <div className="card p-4">
+                <p className="text-xs font-bold text-muted">Proveedores para lo que quieres surtir</p>
+                <ul className="mt-2 space-y-2">
+                  {suppliers.map((supplier) => (
+                    <li key={supplier.id}>
+                      <Link href={`/mayoreo/${supplier.slug}`} className="flex items-center gap-2 text-sm hover:underline">
+                        <span className="text-lg">{supplier.cover_emoji}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="block truncate font-bold">{supplier.name}</span>
+                          <span className="block truncate text-[11px] text-muted">
+                            {supplier.specialty || supplier.category}
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {buyers.length > 0 && (
+              <div className="card p-4">
+                <p className="text-xs font-bold text-muted">Tiendas que buscan lo que produces</p>
+                <ul className="mt-2 space-y-2">
+                  {buyers.map((buyer) => (
+                    <li key={buyer.id}>
+                      <Link href={`/shop/${buyer.slug}`} className="flex items-center gap-2 text-sm hover:underline">
+                        <span className="text-lg">{buyer.cover_emoji}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="block truncate font-bold">{buyer.name}</span>
+                          <span className="block truncate text-[11px] text-muted">
+                            busca: {buyer.sourcing_needs}
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="mt-6">
         <div className="mb-2 flex items-center justify-between">

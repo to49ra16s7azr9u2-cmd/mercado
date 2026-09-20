@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS shops (
   legal_email    TEXT NOT NULL DEFAULT '',
   return_policy  TEXT NOT NULL DEFAULT '',
   delivery_note  TEXT NOT NULL DEFAULT '',
+  specialty      TEXT NOT NULL DEFAULT '',
+  sourcing_needs TEXT NOT NULL DEFAULT '',
+  is_producer    INTEGER NOT NULL DEFAULT 0,
   ship_from      TEXT NOT NULL DEFAULT '',
   status         TEXT NOT NULL DEFAULT 'pending',
   created_at     TEXT NOT NULL
@@ -91,6 +94,10 @@ CREATE TABLE IF NOT EXISTS items (
   offers_enabled INTEGER NOT NULL DEFAULT 1,
   shop_id        TEXT REFERENCES shops(id),
   stock          INTEGER NOT NULL DEFAULT 1,
+  external_sku   TEXT NOT NULL DEFAULT '',
+  origin         TEXT NOT NULL DEFAULT 'own',
+  source_shop_id TEXT REFERENCES shops(id),
+  source_item_id TEXT,
   views          INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL
@@ -153,6 +160,8 @@ CREATE TABLE IF NOT EXISTS orders (
   quantity       INTEGER NOT NULL DEFAULT 1,
   shop_id        TEXT REFERENCES shops(id),
   variant_label  TEXT NOT NULL DEFAULT '',
+  is_wholesale   INTEGER NOT NULL DEFAULT 0,
+  shipment_id    TEXT,
   points_used    INTEGER NOT NULL DEFAULT 0,
   coupon_id      TEXT,
   coupon_amount  INTEGER NOT NULL DEFAULT 0,
@@ -289,5 +298,113 @@ CREATE TABLE IF NOT EXISTS reports (
   target_id  TEXT NOT NULL,
   reason     TEXT NOT NULL,
   body       TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+
+/* ===================== Red de negocios (B2B y colectivos) ==================== */
+
+-- Relación comercial entre dos tiendas (quien compra solicita, quien provee aprueba)
+CREATE TABLE IF NOT EXISTS shop_partners (
+  id                TEXT PRIMARY KEY,
+  buyer_shop_id     TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  supplier_shop_id  TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  status            TEXT NOT NULL DEFAULT 'pending',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL,
+  decided_at        TEXT,
+  UNIQUE (buyer_shop_id, supplier_shop_id)
+);
+CREATE INDEX IF NOT EXISTS idx_partners_supplier ON shop_partners(supplier_shop_id);
+CREATE INDEX IF NOT EXISTS idx_partners_buyer ON shop_partners(buyer_shop_id);
+
+-- Precios de mayoreo por volumen
+CREATE TABLE IF NOT EXISTS b2b_prices (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id  TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  min_qty  INTEGER NOT NULL,
+  price    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_b2b_item ON b2b_prices(item_id);
+
+-- Envíos consolidados: varios pedidos en una sola recolección
+CREATE TABLE IF NOT EXISTS shipments (
+  id           TEXT PRIMARY KEY,
+  shop_id      TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  method       TEXT NOT NULL DEFAULT 'comodo',
+  region       TEXT NOT NULL DEFAULT '',
+  status       TEXT NOT NULL DEFAULT 'open',
+  tracking     TEXT NOT NULL DEFAULT '',
+  pickup_date  TEXT NOT NULL DEFAULT '',
+  unit_cost    INTEGER NOT NULL DEFAULT 0,
+  total_cost   INTEGER NOT NULL DEFAULT 0,
+  saved        INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_shipments_shop ON shipments(shop_id);
+
+-- Colectivos: mercados, corredores comerciales o alianzas de tiendas
+CREATE TABLE IF NOT EXISTS collectives (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  slug        TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL DEFAULT '',
+  emoji       TEXT NOT NULL DEFAULT '🏛️',
+  region      TEXT NOT NULL DEFAULT '',
+  owner_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS collective_members (
+  collective_id TEXT NOT NULL REFERENCES collectives(id) ON DELETE CASCADE,
+  shop_id       TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  role          TEXT NOT NULL DEFAULT 'member',
+  joined_at     TEXT NOT NULL,
+  PRIMARY KEY (collective_id, shop_id)
+);
+
+-- Paquetes cruzados entre tiendas (venta complementaria)
+CREATE TABLE IF NOT EXISTS bundles (
+  id            TEXT PRIMARY KEY,
+  title         TEXT NOT NULL,
+  description   TEXT NOT NULL DEFAULT '',
+  owner_shop_id TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  discount      INTEGER NOT NULL DEFAULT 0,
+  min_price     INTEGER NOT NULL DEFAULT 0,
+  status        TEXT NOT NULL DEFAULT 'active',
+  created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS bundle_items (
+  bundle_id TEXT NOT NULL REFERENCES bundles(id) ON DELETE CASCADE,
+  item_id   TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  shop_id   TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  position  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (bundle_id, item_id)
+);
+CREATE INDEX IF NOT EXISTS idx_bundle_items_item ON bundle_items(item_id);
+
+-- Adelanto de saldo sobre ventas en curso
+CREATE TABLE IF NOT EXISTS advances (
+  id          TEXT PRIMARY KEY,
+  shop_id     TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount      INTEGER NOT NULL,
+  fee         INTEGER NOT NULL DEFAULT 0,
+  outstanding INTEGER NOT NULL DEFAULT 0,
+  status      TEXT NOT NULL DEFAULT 'active',
+  created_at  TEXT NOT NULL,
+  closed_at   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_advances_shop ON advances(shop_id);
+
+-- Registro de importaciones de catálogo
+CREATE TABLE IF NOT EXISTS import_jobs (
+  id         TEXT PRIMARY KEY,
+  shop_id    TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  filename   TEXT NOT NULL DEFAULT '',
+  created    INTEGER NOT NULL DEFAULT 0,
+  updated    INTEGER NOT NULL DEFAULT 0,
+  skipped    INTEGER NOT NULL DEFAULT 0,
+  errors     TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );

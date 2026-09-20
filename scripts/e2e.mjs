@@ -239,6 +239,151 @@ await step("el inventario baja y el pedido llega a la tienda", async () => {
   await sp2.getByText("Enviado").first().waitFor({ timeout: 20000 });
 });
 
+/* --------------------- Red de negocios entre tiendas ---------------------- */
+
+const { DatabaseSync: DB } = await import("node:sqlite");
+let supplierCtx, supplierPage, supplierSlug = "artesanias-tonantzin";
+
+await step("solicitar mayoreo a un proveedor", async () => {
+  await sp2.goto(`${BASE}/mayoreo`);
+  await sp2.getByText("Artesanías Tonantzin").first().waitFor({ timeout: 20000 });
+  await sp2.goto(`${BASE}/mayoreo/${supplierSlug}`);
+  await sp2.getByText("Solicitar acceso a mayoreo").waitFor({ timeout: 20000 });
+  await sp2.fill('textarea[name="note"]', "Somos una tienda de prueba automatizada.");
+  await sp2.getByRole("button", { name: /Enviar solicitud/ }).click();
+  await sp2.getByText(/Solicitud enviada|Solicitud en revisión/).first().waitFor({ timeout: 20000 });
+});
+
+await step("el proveedor aprueba la solicitud", async () => {
+  const db = new DB("data/mercado.db");
+  const shop = db.prepare("select owner_id from shops where slug = ?").get(supplierSlug);
+  db.prepare("insert or replace into sessions (token,user_id,created_at) values (?,?,?)")
+    .run("e2esupplier", shop.owner_id, new Date().toISOString());
+  db.close();
+  supplierCtx = await browser.newContext();
+  await supplierCtx.addCookies([{ name: "mercado_session", value: "e2esupplier", url: BASE }]);
+  supplierPage = await supplierCtx.newPage();
+  await supplierPage.goto(`${BASE}/mypage/shop/wholesale`);
+  await supplierPage.getByText("Tienda Automática MX").first().waitFor({ timeout: 20000 });
+  await supplierPage.getByRole("button", { name: "Aprobar" }).first().click();
+  await supplierPage.getByText("Aprobada").first().waitFor({ timeout: 20000 });
+});
+
+let wholesaleOrderUrl;
+await step("hacer un pedido de mayoreo", async () => {
+  await sp2.goto(`${BASE}/mayoreo/${supplierSlug}`);
+  await sp2.getByText("Pedido de mayoreo").first().waitFor({ timeout: 20000 });
+  const qty = sp2.locator('input[name="quantity"]').first();
+  await qty.fill("12");
+  await sp2.locator('select[name="payment_method"]').first().selectOption("spei");
+  await sp2.getByRole("button", { name: /Hacer pedido de mayoreo/ }).first().click();
+  await sp2.waitForURL(/\/transaction\/.*new=1/, { timeout: 25000 });
+  wholesaleOrderUrl = sp2.url().split("?")[0];
+});
+
+await step("el proveedor envía el pedido de mayoreo", async () => {
+  await supplierPage.goto(wholesaleOrderUrl);
+  await supplierPage.getByText("Registrar el envío").waitFor({ timeout: 20000 });
+  await supplierPage.fill('input[name="tracking"]', "MDB1234567890MX");
+  await supplierPage.getByRole("button", { name: "Marcar como enviado" }).click();
+  await supplierPage.getByText(/Paquete enviado/).first().waitFor({ timeout: 20000 });
+});
+
+await step("revender lo surtido con crédito al taller", async () => {
+  await sp2.goto(`${BASE}/mypage/shop`);
+  await sp2.getByText("Mercancía surtida lista para publicar").waitFor({ timeout: 25000 });
+  await sp2.locator('input[name="price"]').first().fill("420");
+  await sp2.getByRole("button", { name: /Publicar en mi tienda/ }).first().click();
+  await sp2.waitForURL(/\/item\/.*published=1/, { timeout: 25000 });
+  await sp2.getByText("Elaborado por").first().waitFor({ timeout: 20000 });
+  const body = await sp2.innerText("body");
+  if (!body.includes("Artesanías Tonantzin")) throw new Error("falta el crédito al productor");
+});
+
+await step("importar catálogo por CSV", async () => {
+  await sp2.goto(`${BASE}/mypage/shop/import`);
+  await sp2.getByText("Importar catálogo (CSV)").waitFor({ timeout: 20000 });
+  await sp2.locator("details summary").click();
+  await sp2.fill('textarea[name="csv"]',
+    "sku,titulo,descripcion,precio,inventario,categoria,marca,talla,color,variantes\n" +
+    "E2E-1,Playera importada por CSV,Alta masiva de prueba,350,7,mujer-playeras-corta,Sin marca,M,Negro,\n" +
+    "E2E-2,Bolsa importada por CSV,Alta masiva de prueba,780,4,mujer-bolsas-mano,Sin marca,,Café,Chica:2|Grande:2\n");
+  await sp2.getByRole("button", { name: "Importar" }).click();
+  await sp2.getByText(/Importación lista/).waitFor({ timeout: 25000 });
+  await sp2.goto(`${BASE}/mypage/shop/items`);
+  await sp2.getByText("Bolsa importada por CSV").first().waitFor({ timeout: 20000 });
+});
+
+await step("crear colectivo y aparecer en el directorio", async () => {
+  await sp2.goto(`${BASE}/mypage/shop/collectives`);
+  await sp2.getByText("Crear colectivo").first().waitFor({ timeout: 20000 });
+  await sp2.fill("#name", `Colectivo de Prueba ${Date.now().toString().slice(-5)}`);
+  await sp2.fill("#description", "Colectivo creado por la prueba end-to-end.");
+  await sp2.getByRole("button", { name: "Crear colectivo" }).click();
+  await sp2.waitForURL(/\/colectivo\//, { timeout: 25000 });
+  await sp2.getByText("Tiendas del colectivo").waitFor({ timeout: 20000 });
+});
+
+await step("armar un paquete cruzado con la tienda aliada", async () => {
+  await sp2.goto(`${BASE}/mypage/shop/bundles`);
+  await sp2.getByText("Nuevo paquete cruzado").waitFor({ timeout: 20000 });
+  await sp2.fill("#title", "Paquete de prueba automática");
+  await sp2.fill("#discount", "150");
+  await sp2.locator('fieldset input[name="item_id"]').first().check();
+  const allied = sp2.locator("fieldset").nth(1).locator('input[name="item_id"]');
+  if (!(await allied.count())) throw new Error("no hay productos de tiendas aliadas");
+  await allied.first().check();
+  await sp2.getByRole("button", { name: "Crear paquete" }).click();
+  await sp2.getByText(/Paquete cruzado creado/).waitFor({ timeout: 25000 });
+});
+
+await step("consolidar envíos y marcarlos recolectados", async () => {
+  // la cuenta demo compra dos veces más para tener pedidos que consolidar
+  const db = new DB("data/mercado.db");
+  const shop = db.prepare("select id from shops where slug like 'tienda-automatica%' order by created_at desc limit 1").get();
+  const items = db.prepare("select id from items where shop_id = ? and status = 'on_sale' limit 2").all(shop.id);
+  db.close();
+  for (const item of items) {
+    await page.goto(`${BASE}/checkout/${item.id}?qty=1`);
+    await page.getByText("Resumen del pedido").waitFor({ timeout: 20000 });
+    await page.getByRole("button", { name: /Confirmar la compra/ }).click();
+    await page.waitForURL(/\/transaction\//, { timeout: 25000 });
+  }
+  await sp2.goto(`${BASE}/mypage/shop/shipments`);
+  await sp2.getByText("Nuevo envío consolidado").waitFor({ timeout: 20000 });
+  const boxes = sp2.locator('input[name="order_id"]');
+  const total = await boxes.count();
+  if (total < 2) throw new Error(`solo hay ${total} pedidos consolidables`);
+  await boxes.nth(0).check();
+  await boxes.nth(1).check();
+  await sp2.getByRole("button", { name: /Crear envío consolidado/ }).click();
+  // el envío queda guardado; se recarga para operar sobre la lista persistida
+  await sp2.waitForTimeout(2500);
+  await sp2.goto(`${BASE}/mypage/shop/shipments`, { waitUntil: "domcontentloaded" });
+  await sp2.getByText("En preparación").first().waitFor({ timeout: 25000 });
+  await sp2.getByRole("button", { name: /Marcar como recolectado/ }).first().click();
+  await sp2.getByText("Recolectado").first().waitFor({ timeout: 25000 });
+});
+
+await step("solicitar adelanto sobre ventas en curso", async () => {
+  await sp2.goto(`${BASE}/mypage/shop/financing`);
+  await sp2.getByText("Ventas en curso").first().waitFor({ timeout: 20000 });
+  const form = sp2.getByRole("button", { name: "Solicitar adelanto" });
+  if (await form.isDisabled()) throw new Error("no hay ventas suficientes para el adelanto");
+  await form.click();
+  await sp2.getByText(/Adelanto de \$|Adelanto activo/).first().waitFor({ timeout: 25000 });
+});
+
+await step("páginas de la red responden", async () => {
+  for (const path of ["/mayoreo", "/colectivos", "/mypage/shop/wholesale", "/mypage/shop/partners",
+    "/mypage/shop/purchases", "/mypage/shop/shipments", "/mypage/shop/import",
+    "/mypage/shop/bundles", "/mypage/shop/collectives", "/mypage/shop/financing"]) {
+    const res = await sp2.goto(BASE + path);
+    if (res.status() !== 200) throw new Error(`${path} → ${res.status()}`);
+  }
+  if (supplierCtx) await supplierCtx.close();
+});
+
 await step("páginas de Shops responden", async () => {
   for (const path of ["/shops", "/mypage/shop", "/mypage/shop/items", "/mypage/shop/orders",
     "/mypage/shop/settings", "/mypage/shops", "/legal/shops"]) {

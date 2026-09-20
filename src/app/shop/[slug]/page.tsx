@@ -52,6 +52,11 @@ export default async function ShopPage({
             <p className="truncate text-xs text-white/85">
               {shop.category} · {shop.ship_from || "México"} · desde {shortDate(shop.created_at)}
             </p>
+            {shop.specialty && (
+              <p className="mt-1 truncate text-xs text-white/85">
+                {shop.is_producer ? "🛠️ Produce: " : "Especialidad: "}{shop.specialty}
+              </p>
+            )}
           </div>
           {isOwner ? (
             <Link href="/mypage/shop" className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-brand-darker">
@@ -115,10 +120,17 @@ export default async function ShopPage({
             <dl className="p-5 text-sm">
               <div className="flex gap-4 py-1.5"><dt className="w-44 shrink-0 text-muted">Tipo de vendedor</dt><dd>{businessTypeLabel(shop.business_type)}</dd></div>
               <div className="flex gap-4 py-1.5"><dt className="w-44 shrink-0 text-muted">Responsable</dt><dd>{owner.name}</dd></div>
+              <div className="flex gap-4 py-1.5"><dt className="w-44 shrink-0 text-muted">Especialidad</dt><dd>{shop.specialty || "Sin especificar"}</dd></div>
+              <div className="flex gap-4 py-1.5"><dt className="w-44 shrink-0 text-muted">Busca surtirse de</dt><dd>{shop.sourcing_needs || "—"}</dd></div>
               <div className="flex gap-4 py-1.5"><dt className="w-44 shrink-0 text-muted">Envíos desde</dt><dd>{shop.ship_from || "México"}</dd></div>
               <div className="flex gap-4 py-1.5"><dt className="w-44 shrink-0 text-muted">Tiempo de entrega</dt><dd>{shop.delivery_note || "De 2 a 5 días hábiles"}</dd></div>
               <div className="flex gap-4 py-1.5"><dt className="w-44 shrink-0 text-muted">Devoluciones</dt><dd>{shop.return_policy || "Según la Ley Federal de Protección al Consumidor."}</dd></div>
             </dl>
+            <div className="p-5">
+              <Link href={`/mayoreo/${shop.slug}`} className="link text-sm font-bold">
+                Ver catálogo de mayoreo para tiendas →
+              </Link>
+            </div>
             <div className="p-5">
               <Link href={`/shop/${shop.slug}/legal`} className="link text-sm font-bold">
                 Ver información del vendedor y datos fiscales →

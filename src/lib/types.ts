@@ -42,6 +42,10 @@ export type Item = {
   offers_enabled: number;
   shop_id: string | null;
   stock: number;
+  external_sku: string;
+  origin: string;
+  source_shop_id: string | null;
+  source_item_id: string | null;
   views: number;
   created_at: string;
   updated_at: string;
@@ -77,9 +81,77 @@ export type Shop = {
   legal_email: string;
   return_policy: string;
   delivery_note: string;
+  specialty: string;
+  sourcing_needs: string;
+  is_producer: number;
   ship_from: string;
   status: "pending" | "active" | "suspended";
   created_at: string;
+};
+
+export type ShopPartner = {
+  id: string;
+  buyer_shop_id: string;
+  supplier_shop_id: string;
+  status: "pending" | "approved" | "rejected";
+  note: string;
+  created_at: string;
+  decided_at: string | null;
+};
+
+export type B2bPrice = {
+  id: number;
+  item_id: string;
+  min_qty: number;
+  price: number;
+};
+
+export type Shipment = {
+  id: string;
+  shop_id: string;
+  method: string;
+  region: string;
+  status: "open" | "picked_up" | "closed";
+  tracking: string;
+  pickup_date: string;
+  unit_cost: number;
+  total_cost: number;
+  saved: number;
+  created_at: string;
+};
+
+export type Collective = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  emoji: string;
+  region: string;
+  owner_id: string;
+  created_at: string;
+};
+
+export type Bundle = {
+  id: string;
+  title: string;
+  description: string;
+  owner_shop_id: string;
+  discount: number;
+  min_price: number;
+  status: string;
+  created_at: string;
+};
+
+export type Advance = {
+  id: string;
+  shop_id: string;
+  user_id: string;
+  amount: number;
+  fee: number;
+  outstanding: number;
+  status: "active" | "repaid";
+  created_at: string;
+  closed_at: string | null;
 };
 
 export type Variant = {
@@ -110,6 +182,8 @@ export type Order = {
   quantity: number;
   shop_id: string | null;
   variant_label: string;
+  is_wholesale: number;
+  shipment_id: string | null;
   points_used: number;
   coupon_id: string | null;
   coupon_amount: number;

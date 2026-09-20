@@ -22,7 +22,7 @@ export function ShopForm({
     name: string; description: string; category: string; cover_emoji: string; logo_seed: string;
     business_type: string; legal_name: string; rfc: string; legal_address: string;
     legal_phone: string; legal_email: string; return_policy: string; delivery_note: string;
-    ship_from: string;
+    ship_from: string; specialty?: string; sourcing_needs?: string; is_producer?: number;
   };
 }) {
   const [state, formAction] = useActionState(action, {});
@@ -89,6 +89,29 @@ export function ShopForm({
             <input id="delivery_note" name="delivery_note" defaultValue={shop?.delivery_note}
               className="input" placeholder="De 2 a 5 días hábiles" />
           </div>
+        </div>
+      </section>
+
+      <section className="card space-y-4 p-4">
+        <h2 className="section-title">Especialidad y surtido</h2>
+        <p className="text-xs text-muted">
+          Esto conecta tu tienda con otras: te sugerimos proveedores para lo que quieres surtir y
+          compradoras para lo que tú produces, para que cada quien se dedique a lo que hace mejor.
+        </p>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="is_producer" defaultChecked={(shop?.is_producer ?? 1) === 1}
+            className="accent-[#06c755]" />
+          Producimos o elaboramos parte de lo que vendemos
+        </label>
+        <div>
+          <label className="label" htmlFor="specialty">En qué te especializas</label>
+          <input id="specialty" name="specialty" defaultValue={shop?.specialty} className="input"
+            placeholder="Ej.: bordado a mano de manta, cerámica de alta temperatura, tostado de café" />
+        </div>
+        <div>
+          <label className="label" htmlFor="sourcing_needs">Qué te gustaría surtir con otras tiendas</label>
+          <input id="sourcing_needs" name="sourcing_needs" defaultValue={shop?.sourcing_needs} className="input"
+            placeholder="Ej.: velas artesanales, joyería de plata, empaques de papel" />
         </div>
       </section>
 

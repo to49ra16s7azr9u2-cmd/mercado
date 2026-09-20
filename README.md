@@ -80,6 +80,24 @@ npm run test:e2e   # prueba end-to-end del recorrido completo (requiere npm run 
   «solo Mercado Shops» en la búsqueda.
 - Reglas del programa en `/legal/shops`.
 
+**Red de negocios entre tiendas (B2B)**
+- **Mayoreo**: cada tienda define precios por volumen (escalones de piezas) y aprueba a las tiendas
+  que quieren surtirse con ella; los pedidos de mayoreo pagan 5 % de comisión.
+- **Especialización**: cada tienda declara en qué se especializa y qué quiere surtir con otras;
+  el panel sugiere proveedores para lo que te falta y compradoras para lo que produces.
+- **Reventa con crédito al taller**: la mercancía comprada en mayoreo se publica en tu tienda con
+  un clic, conservando en la ficha el crédito de quien la elabora, y midiendo qué parte de tu
+  catálogo produces tú y qué parte surtes.
+- **Envíos consolidados**: agrupa pedidos pagados en una sola recolección, con tarifa por paquete,
+  ahorro calculado y guías individuales al marcar la recolección.
+- **Colectivos**: mercados, corredores comerciales o alianzas de oficio con página y escaparate común.
+- **Paquetes cruzados**: productos de varias tiendas en un paquete; quien compra uno recibe un cupón
+  para las demás tiendas del paquete.
+- **Adelanto de ventas**: cobra hasta el 70 % de las ventas en curso con 5 % de comisión; se amortiza
+  automáticamente conforme se completan esas ventas.
+- **Importar y exportar catálogo (CSV)**: alta masiva por SKU con variantes, plantilla descargable y
+  exportación del catálogo completo.
+
 **Compra y transacción**
 - Ficha con galería, favoritos, comentarios públicos, ofertas (aceptar/rechazar) y relacionados.
 - Checkout con dirección, método de pago, MSI, puntos, cupones y desglose en vivo.
@@ -113,8 +131,9 @@ src/
                   transacción, mi cuenta, tiendas, perfil, avisos, guía, ayuda, legal…)
   components/     cabecera, tarjetas, galería, formularios, filtros y panel de compra
   lib/            db.ts, auth.ts, queries.ts, actions.ts, constants.ts, format.ts
-  db/schema.sql   esquema de 23 tablas (incluye shops, item_variants y shop_follows)
-scripts/          seed.ts (datos de ejemplo) y e2e.mjs (prueba end-to-end, 18 pasos)
+  db/schema.sql   esquema de 31 tablas (shops, variantes, mayoreo, colectivos, paquetes,
+                  envíos consolidados y adelantos)
+scripts/          seed.ts (datos de ejemplo) y e2e.mjs (prueba end-to-end, 27 pasos)
 ```
 
 ## 日本語での概要
@@ -125,6 +144,12 @@ scripts/          seed.ts (datos de ejemplo) y e2e.mjs (prueba end-to-end, 18 pa
 相互評価・売上金・ポイント・クーポン・本人確認・通知設定に加えて、**メルカリShops 相当の
 「Mercado Shops」**（在庫・バリエーション管理、複数個購入、ショップ運営ダッシュボード、
 特定商取引法にあたる「Información del vendedor」表示）を実装しています。
+
+さらに、**業者間の卸売ネットワーク**を実装しています。各店が「自分の専門（作れるもの）」と
+「他店から仕入れたいもの」を宣言すると、提携提案・卸価格（数量別）・卸注文・仕入れた商品の
+自店への再出品（生産者クレジット付き）・専門特化率の可視化までが一本の流れになります。
+共同集荷による配送費の削減、コレクティブ（市場や商店街単位の共同出店）、店舗横断のクロスセル
+クーポン、売掛金の前払い、CSV による在庫一括取り込みも含みます。
 
 メキシコ向けのローカライズとして、32州・5桁郵便番号・10桁電話番号、MSI（分割手数料無料）、
 OXXO等の店頭現金払い、SPEI送金、CLABEへの振込、連邦消費者保護法・LFPDPPP（ARCO権）に
