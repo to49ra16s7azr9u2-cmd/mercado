@@ -8,6 +8,20 @@ notificaciones y **Mercado Shops**, el módulo de tiendas con inventario y varia
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![Tailwind](https://img.shields.io/badge/Tailwind-4-06C755) ![MXN](https://img.shields.io/badge/moneda-MXN-06C755)
 
+## Sitio de presentación (GitHub Pages)
+
+`docs/` contiene un recorrido estático del proyecto (capturas reales y explicación de la red de
+negocios) pensado para GitHub Pages: <https://to49ra16s7azr9u2-cmd.github.io/mercado/>.
+
+Para publicarlo hay dos caminos, cualquiera sirve:
+
+- **Settings → Pages → Source: «Deploy from a branch»**, rama `claude/lucid-meitner-eebxnm`, carpeta `/docs`.
+- **Settings → Pages → Source: «GitHub Actions»**: el flujo `.github/workflows/pages.yml` publica
+  `docs/` en cada push.
+
+La aplicación en sí es dinámica (Server Actions y base de datos), así que GitHub Pages sólo sirve
+el recorrido; para usarla se ejecuta en local como se indica abajo.
+
 ## Puesta en marcha
 
 ```bash

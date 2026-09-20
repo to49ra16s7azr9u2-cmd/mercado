@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mercado · Clon de Mercari para México con red de negocios</title>
+<meta name="description" content="Mercado: clon completo de Mercari adaptado a México, con Mercado Shops y una red de mayoreo, colectivos y logística compartida entre tiendas. Next.js 16 + SQLite.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2306c755'/%3E%3Cpath d='M16 24h32l-3.4 22a4 4 0 0 1-4 3.4H23.4a4 4 0 0 1-4-3.4L16 24Z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --brand:#06c755; --brand-dark:#04a945; --brand-darker:#038139;
+    --soft:#e9faf0; --tint:#c9f2da; --ink:#14202b; --muted:#6b7a86;
+    --line:#e6eaed; --canvas:#f6f8f9; --surface:#fff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--canvas);color:var(--ink);
+    font-family:"Hiragino Sans","Helvetica Neue",Helvetica,Arial,"Noto Sans",system-ui,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--brand-darker)}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+  header.top{position:sticky;top:0;z-index:20;background:var(--brand);color:#fff}
+  header.top .wrap{display:flex;align-items:center;gap:16px;padding-top:12px;padding-bottom:12px}
+  .logo{font-weight:900;font-size:24px;letter-spacing:-.02em}
+  header.top nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  header.top nav a{color:#fff;text-decoration:none;font-weight:700;font-size:13px;
+    padding:6px 10px;border-radius:8px}
+  header.top nav a:hover{background:rgba(255,255,255,.18)}
+  header.top nav a.cta{background:#fff;color:var(--brand-darker)}
+  .hero{background:linear-gradient(135deg,var(--brand),var(--brand-darker));color:#fff;padding:56px 0 64px}
+  .hero h1{font-size:clamp(28px,5vw,46px);line-height:1.15;margin:0 0 14px;font-weight:900;letter-spacing:-.02em}
+  .hero p{font-size:17px;max-width:720px;margin:0 0 10px;color:rgba(255,255,255,.92)}
+  .badges{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 0}
+  .badge{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);
+    border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700}
+  .hero .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
+  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:10px;padding:11px 18px;
+    font-weight:700;font-size:14px;text-decoration:none;border:1px solid transparent}
+  .btn-white{background:#fff;color:var(--brand-darker)}
+  .btn-ghost{border-color:rgba(255,255,255,.55);color:#fff}
+  section{padding:56px 0}
+  section h2{font-size:clamp(22px,3vw,30px);margin:0 0 8px;font-weight:900;letter-spacing:-.01em}
+  section .lead{color:var(--muted);max-width:760px;margin:0 0 28px}
+  .grid{display:grid;gap:16px}
+  @media(min-width:760px){.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .card h3{margin:0 0 6px;font-size:16px}
+  .card p{margin:0;color:var(--muted);font-size:14px}
+  .card .ico{font-size:22px;display:block;margin-bottom:10px}
+  .shot{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .shot img{width:100%;display:block;border-bottom:1px solid var(--line)}
+  .shot figcaption{padding:12px 14px;font-size:13px;color:var(--muted)}
+  .shot figcaption b{color:var(--ink);display:block;font-size:14px;margin-bottom:2px}
+  .flow{counter-reset:step;display:grid;gap:12px}
+  .flow li{list-style:none;background:var(--surface);border:1px solid var(--line);
+    border-radius:14px;padding:16px 18px 16px 60px;position:relative}
+  .flow li::before{counter-increment:step;content:counter(step);position:absolute;left:18px;top:16px;
+    width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-weight:800;
+    display:grid;place-items:center;font-size:13px}
+  .flow b{display:block;margin-bottom:2px}
+  .flow span{color:var(--muted);font-size:14px}
+  .stats{display:grid;gap:12px;grid-template-columns:repeat(2,1fr)}
+  @media(min-width:760px){.stats{grid-template-columns:repeat(4,1fr)}}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;text-align:center}
+  .stat b{display:block;font-size:26px;font-weight:900}
+  .stat span{font-size:12px;color:var(--muted)}
+  pre{background:#0f1a22;color:#e8f6ee;border-radius:12px;padding:18px;overflow:auto;font-size:13px;line-height:1.7}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);
+    border-radius:14px;overflow:hidden;font-size:14px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line)}
+  th{background:var(--soft);color:var(--brand-darker);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  tr:last-child td{border-bottom:0}
+  .note{background:var(--soft);border:1px solid var(--tint);border-radius:14px;padding:18px;font-size:14px}
+  .jp{background:var(--surface);border-top:1px solid var(--line)}
+  footer{background:var(--surface);border-top:1px solid var(--line);padding:30px 0;color:var(--muted);font-size:13px}
+  .alt{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <span class="logo">Mercado</span>
+    <nav>
+      <a href="#capturas">Capturas</a>
+      <a href="#red">Red de negocios</a>
+      <a href="#mexico">México</a>
+      <a href="#correr">Cómo correrlo</a>
+      <a class="cta" href="https://github.com/to49ra16s7azr9u2-cmd/mercado/tree/claude/lucid-meitner-eebxnm">Ver el código</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <h1>Un clon completo de Mercari para México<br>que además conecta a los negocios entre sí</h1>
+    <p>Marketplace de persona a persona, tiendas con inventario y variantes (Mercado Shops) y una
+       red B2B donde cada negocio se especializa en lo que hace mejor y surte el resto con sus pares.</p>
+    <div class="badges">
+      <span class="badge">Next.js 16 · App Router</span>
+      <span class="badge">React 19 · Server Actions</span>
+      <span class="badge">SQLite nativo (node:sqlite)</span>
+      <span class="badge">Tailwind v4 · paleta LINE #06C755</span>
+      <span class="badge">es-MX · MXN</span>
+    </div>
+    <div class="actions">
+      <a class="btn btn-white" href="#capturas">Ver la aplicación</a>
+      <a class="btn btn-ghost" href="#correr">Correrla en 3 comandos</a>
+    </div>
+  </div>
+</div>
+
+<section id="capturas">
+  <div class="wrap">
+    <h2>La aplicación</h2>
+    <p class="lead">Capturas reales de la app en ejecución, con los datos de ejemplo que crea la semilla:
+      13 personas, 4 tiendas, ~150 artículos, pedidos, calificaciones y una red de negocios ya armada.</p>
+
+    <div class="grid g2">
+      <figure class="shot"><a href="img/home.png"><img src="img/home.png" alt="Portada de Mercado"></a>
+        <figcaption><b>Portada</b>Categorías, búsquedas populares, tendencias, envío gratis, recomendaciones y la sección de Mercado Shops.</figcaption></figure>
+      <figure class="shot"><a href="img/item.png"><img src="img/item.png" alt="Ficha de producto con variantes"></a>
+        <figcaption><b>Ficha de producto</b>Galería, variantes con inventario por talla o color, cantidad, favoritos, comentarios y datos del vendedor.</figcaption></figure>
+      <figure class="shot"><a href="img/shops.png"><img src="img/shops.png" alt="Directorio de tiendas"></a>
+        <figcaption><b>Mercado Shops</b>Directorio de tiendas por giro, con inventario, seguidores y datos fiscales públicos.</figcaption></figure>
+      <figure class="shot"><a href="img/shop.png"><img src="img/shop.png" alt="Página de una tienda"></a>
+        <figcaption><b>Página de tienda</b>Escaparate, estadísticas, especialidad declarada y ficha «Información del vendedor».</figcaption></figure>
+      <figure class="shot"><a href="img/mayoreo.png"><img src="img/mayoreo.png" alt="Directorio de mayoreo"></a>
+        <figcaption><b>Mayoreo entre tiendas</b>Proveedores por giro: pides acceso, te aprueban y ves sus precios por volumen.</figcaption></figure>
+      <figure class="shot"><a href="img/mayoreo-catalogo.png"><img src="img/mayoreo-catalogo.png" alt="Catálogo de mayoreo"></a>
+        <figcaption><b>Catálogo B2B</b>Escalones de precio por piezas; sin relación aprobada los precios aparecen difuminados.</figcaption></figure>
+      <figure class="shot"><a href="img/panel.png"><img src="img/panel.png" alt="Panel de la tienda"></a>
+        <figcaption><b>Panel de la tienda</b>Métricas, mezcla de especialización (producción propia vs. surtido) y conexiones sugeridas.</figcaption></figure>
+      <figure class="shot"><a href="img/sourced.png"><img src="img/sourced.png" alt="Producto surtido con crédito al taller"></a>
+        <figcaption><b>Crédito a quien produce</b>Un producto surtido en mayoreo conserva en su ficha el crédito del taller que lo elabora.</figcaption></figure>
+      <figure class="shot"><a href="img/wholesale.png"><img src="img/wholesale.png" alt="Administración de mayoreo"></a>
+        <figcaption><b>Mayoreo (proveedora)</b>Aprobación de compradoras y edición de escalones de precio por volumen.</figcaption></figure>
+      <figure class="shot"><a href="img/shipments.png"><img src="img/shipments.png" alt="Envíos consolidados"></a>
+        <figcaption><b>Envíos consolidados</b>Varios pedidos en una recolección, con tarifa por paquete y ahorro calculado.</figcaption></figure>
+      <figure class="shot"><a href="img/financing.png"><img src="img/financing.png" alt="Adelanto de ventas"></a>
+        <figcaption><b>Adelanto de ventas</b>Hasta el 70 % de las ventas en curso, con amortización automática al completarse.</figcaption></figure>
+      <figure class="shot"><a href="img/colectivo.png"><img src="img/colectivo.png" alt="Colectivos de tiendas"></a>
+        <figcaption><b>Colectivos</b>Mercados y corredores comerciales que venden juntos y comparten escaparate.</figcaption></figure>
+      <figure class="shot"><a href="img/bundles.png"><img src="img/bundles.png" alt="Paquetes cruzados"></a>
+        <figcaption><b>Paquetes cruzados</b>Productos de varias tiendas: quien compra uno recibe un cupón para las demás.</figcaption></figure>
+      <figure class="shot"><a href="img/import.png"><img src="img/import.png" alt="Importación CSV"></a>
+        <figcaption><b>Catálogo por CSV</b>Alta masiva por SKU con variantes, plantilla descargable y exportación.</figcaption></figure>
+      <figure class="shot"><a href="img/mobile.png"><img src="img/mobile.png" alt="Vista móvil"></a>
+        <figcaption><b>Móvil</b>Barra inferior estilo app, galería y compra con variante y cantidad.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="red">
+  <div class="wrap">
+    <h2>La idea: especializarse y surtirse entre negocios</h2>
+    <p class="lead">El mayoreo entre tiendas no es sólo comprar más barato: permite que cada negocio
+      se concentre en lo que sabe hacer y complete su tienda con lo que otros hacen mejor,
+      sin perder el crédito de quien produce.</p>
+
+    <ol class="flow">
+      <li><b>Cada tienda declara su especialidad</b><span>Qué produce (bordado a mano, cerámica, tostado de café) y qué quiere surtir con otras tiendas.</span></li>
+      <li><b>Mercado sugiere conexiones</b><span>Proveedores para lo que te falta y compradoras para lo que produces, según esas declaraciones.</span></li>
+      <li><b>Se aprueba la relación comercial</b><span>Quien provee decide a quién le muestra sus precios por volumen. Los escalones son por piezas.</span></li>
+      <li><b>Pedido de mayoreo</b><span>Con inventario descontado, mensajería de la transacción, factura y 5 % de comisión.</span></li>
+      <li><b>Reventa con crédito al taller</b><span>La mercancía recibida se publica en la tienda compradora con un clic; la ficha dice quién la elabora.</span></li>
+      <li><b>Se mide la especialización</b><span>El panel muestra qué parte del catálogo produce la tienda y qué parte surte con aliadas.</span></li>
+    </ol>
+
+    <div class="grid g3" style="margin-top:22px">
+      <div class="card"><span class="ico">🚚</span><h3>Logística compartida</h3><p>Envíos consolidados: varios pedidos en una recolección, tarifa por paquete y ahorro calculado.</p></div>
+      <div class="card"><span class="ico">🏛️</span><h3>Colectivos</h3><p>Mercados, corredores comerciales y alianzas de oficio con página y escaparate común.</p></div>
+      <div class="card"><span class="ico">🎁</span><h3>Venta cruzada</h3><p>Paquetes entre tiendas: comprar en una genera un cupón para las demás del paquete.</p></div>
+      <div class="card"><span class="ico">⚡</span><h3>Adelanto de ventas</h3><p>Liquidez sobre pedidos en curso, con amortización automática y comisión del 5 %.</p></div>
+      <div class="card"><span class="ico">📤</span><h3>Catálogo por CSV</h3><p>Alta masiva por SKU con variantes e inventario; exportación del catálogo completo.</p></div>
+      <div class="card"><span class="ico">🧾</span><h3>Transparencia legal</h3><p>Datos fiscales públicos por tienda, como pide la Ley Federal de Protección al Consumidor.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="mexico">
+  <div class="wrap">
+    <h2>Adaptado a México</h2>
+    <p class="lead">No es una traducción: cambian la moneda, la geografía, los métodos de pago,
+      la mensajería y el marco legal.</p>
+    <table>
+      <tr><th>Elemento</th><th>Implementación</th></tr>
+      <tr><td>Moneda</td><td>Peso mexicano (MXN), formato <code>es-MX</code>, precios desde $30</td></tr>
+      <tr><td>Territorio</td><td>32 estados, municipios y alcaldías, C.P. de 5 dígitos, teléfonos de 10 dígitos, direcciones con colonia</td></tr>
+      <tr><td>Pagos</td><td>Tarjeta, <b>meses sin intereses</b> (3, 6, 9 y 12 desde $2,000), efectivo en tiendas, <b>SPEI</b>, saldo, puntos y PayPal</td></tr>
+      <tr><td>Cobros</td><td>Transferencia a <b>CLABE</b> de 18 dígitos (mínimo $300, comisión $25)</td></tr>
+      <tr><td>Envíos</td><td>Envío Fácil y Envío Cómodo con guía prepagada y rastreo; correo nacional; paquetería propia</td></tr>
+      <tr><td>Idioma</td><td>Español de México: playera, tenis, bolsa, chamarra, celular, computadora, carriola, calificaciones…</td></tr>
+      <tr><td>Legal</td><td>Ley Federal de Protección al Consumidor, LFPDPPP con derechos ARCO, Profeco y artículos prohibidos según la normativa mexicana</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>Qué hay dentro</h2>
+    <div class="stats">
+      <div class="stat"><b>31</b><span>tablas en SQLite</span></div>
+      <div class="stat"><b>123</b><span>categorías en 3 niveles</span></div>
+      <div class="stat"><b>27</b><span>pasos de prueba end-to-end</span></div>
+      <div class="stat"><b>0</b><span>dependencias binarias</span></div>
+    </div>
+    <div class="grid g3" style="margin-top:22px">
+      <div class="card"><span class="ico">🛍️</span><h3>Marketplace C2C</h3><p>Publicación con fotos, ofertas y regateo, comentarios, favoritos, búsquedas guardadas, historial, cupones, puntos y saldo.</p></div>
+      <div class="card"><span class="ico">🔄</span><h3>Transacciones</h3><p>Pago retenido, envío con guía, confirmación de recepción, calificación mutua, cancelación con reembolso y mensajería privada.</p></div>
+      <div class="card"><span class="ico">🏪</span><h3>Mercado Shops</h3><p>Alta con datos fiscales, revisión, inventario, variantes con SKU, pedidos por estado y panel de la tienda.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="correr">
+  <div class="wrap">
+    <h2>Cómo correrlo</h2>
+    <p class="lead">La aplicación es dinámica (Server Actions y base de datos), así que esta página de
+      GitHub Pages es un recorrido estático. Para usarla de verdad basta con clonarla:</p>
+<pre><code>git clone -b claude/lucid-meitner-eebxnm https://github.com/to49ra16s7azr9u2-cmd/mercado.git
+cd mercado
+npm install
+npm run seed     # base de datos de ejemplo
+npm run dev      # http://localhost:3000</code></pre>
+    <p class="lead" style="margin-top:16px">Cuenta de demostración: <b>demo@mercado.mx</b> / <b>demo1234</b>.
+      Las demás cuentas de ejemplo usan <code>mercado1234</code>.</p>
+    <div class="note">
+      <b>Nota honesta:</b> este sitio de GitHub Pages sirve archivos estáticos, por lo que aquí
+      no corren las Server Actions ni la base de datos. Las capturas de arriba son de la aplicación
+      real en ejecución, y la prueba end-to-end (<code>npm run test:e2e</code>) recorre 27 pasos:
+      desde registrarse y comprar hasta abrir tienda, surtirse en mayoreo, revender con crédito al
+      taller, consolidar envíos y pedir un adelanto.
+    </div>
+  </div>
+</section>
+
+<section class="jp">
+  <div class="wrap">
+    <h2>日本語での概要</h2>
+    <p class="lead">メルカリ相当の機能をひととおり備えたクローンの<b>メキシコ版</b>です。配色は LINE
+      グリーン（#06C755）、UI はメキシコのスペイン語、通貨は MXN。</p>
+    <div class="grid g2">
+      <div class="card"><h3>フリマ機能（C2C）</h3><p>出品・検索・いいね・コメント・値下げ交渉・購入・取引メッセージ・発送通知・受取評価・相互評価・売上金・ポイント・クーポン・本人確認・通知設定。</p></div>
+      <div class="card"><h3>Mercado Shops（メルカリShops 相当）</h3><p>事業者登録（RFC等の審査）、在庫とバリエーション管理、複数個購入、ショップ運営ダッシュボード、特定商取引法にあたる「Información del vendedor」表示。</p></div>
+      <div class="card"><h3>業者間の卸売ネットワーク</h3><p>各店が「自分の専門」と「仕入れたいもの」を宣言 → 取引先マッチングと承認 → 数量別卸価格での発注 → 仕入れた商品を自店に再出品（生産者クレジット付き）→ 専門特化率の可視化。</p></div>
+      <div class="card"><h3>共同オペレーション</h3><p>共同集荷による配送費削減、コレクティブ（市場・商店街単位の共同出店）、店舗横断クロスセルクーポン、売掛金の前払い、CSV 一括取り込み。</p></div>
+    </div>
+    <p class="lead" style="margin-top:18px">このページは静的なショーケースです。アプリ本体は
+      <code>npm install &amp;&amp; npm run seed &amp;&amp; npm run dev</code> でローカル起動できます。</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p><b>Mercado</b> · Proyecto de demostración sin valor comercial. No está afiliado a Mercari, LINE ni a ninguna marca mencionada.</p>
+    <p><a href="https://github.com/to49ra16s7azr9u2-cmd/mercado/tree/claude/lucid-meitner-eebxnm">Código fuente en GitHub</a></p>
+  </div>
+</footer>
+
+</body>
+</html>
