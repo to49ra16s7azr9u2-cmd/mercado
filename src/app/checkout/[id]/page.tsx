@@ -1,0 +1,64 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { currentUser } from "@/lib/auth";
+import { cardsOf, itemById, usableCoupons, userById } from "@/lib/queries";
+import { purchaseAction } from "@/lib/actions";
+import { CheckoutForm } from "@/components/CheckoutForm";
+import { conditionLabel, shippingCostOf, shippingLabel } from "@/lib/constants";
+import { money } from "@/lib/format";
+
+export const metadata = { title: "Confirmar compra" };
+
+export default async function CheckoutPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const item = itemById(id);
+  if (!item) notFound();
+  const user = await currentUser();
+  if (!user) redirect(`/login?next=/checkout/${id}`);
+  if (item.seller_id === user.id) redirect(`/item/${id}`);
+  if (item.status !== "on_sale") redirect(`/item/${id}`);
+
+  const seller = userById(item.seller_id)!;
+  const shippingCost = item.shipping_payer === "buyer" ? shippingCostOf(item.shipping_method) : 0;
+
+  return (
+    <div>
+      <h1 className="text-xl font-bold">Confirmar la compra</h1>
+      <div className="card mt-4 flex gap-3 p-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={item.image ?? ""} alt="" className="h-20 w-20 rounded-lg object-cover" />
+        <div className="min-w-0 flex-1">
+          <Link href={`/item/${item.id}`} className="line-clamp-2 text-sm font-bold hover:underline">
+            {item.title}
+          </Link>
+          <p className="mt-1 text-xs text-muted">
+            {conditionLabel(item.condition)} · {shippingLabel(item.shipping_method)}
+          </p>
+          <p className="mt-1 text-xs text-muted">Vendido por {seller.name}</p>
+        </div>
+        <p className="text-base font-black">{money(item.price)}</p>
+      </div>
+
+      <div className="mt-5">
+        <CheckoutForm
+          action={purchaseAction}
+          itemId={item.id}
+          price={item.price}
+          shippingCost={shippingCost}
+          points={user.points}
+          balance={user.balance}
+          coupons={usableCoupons(user.id, item.price)}
+          cards={cardsOf(user.id)}
+          address={{
+            name: user.addr_name,
+            zip: user.addr_zip,
+            region: user.addr_region,
+            city: user.addr_city,
+            line: user.addr_line,
+            phone: user.addr_phone,
+          }}
+        />
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #06c755;
+  --color-brand-dark: #04a945;
+  --color-brand-darker: #038139;
+  --color-brand-soft: #e9faf0;
+  --color-brand-tint: #c9f2da;
+  --color-ink: #14202b;
+  --color-muted: #6b7a86;
+  --color-line: #e6eaed;
+  --color-surface: #ffffff;
+  --color-canvas: #f6f8f9;
+  --color-warn: #ff6b35;
+  --font-sans: "Hiragino Sans", "Helvetica Neue", Helvetica, Arial, "Noto Sans", system-ui, sans-serif;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+body {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 py-2.5 text-sm font-bold text-ink transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-muted transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-lg {
+    @apply w-full rounded-xl px-5 py-3.5 text-base;
+  }
+  .card {
+    @apply rounded-xl border border-line bg-white;
+  }
+  .input {
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm outline-none placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand/25;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-bold text-muted;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-line bg-white px-3 py-1 text-xs font-bold text-ink;
+  }
+  .chip-active {
+    @apply border-brand bg-brand-soft text-brand-darker;
+  }
+  .section-title {
+    @apply text-base font-bold text-ink;
+  }
+  .link {
+    @apply text-brand-darker underline-offset-2 hover:underline;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.sold-ribbon {
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8c5a 100%);
+}
