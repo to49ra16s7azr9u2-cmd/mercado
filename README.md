@@ -86,7 +86,9 @@ npm run test:e2e   # prueba end-to-end del recorrido completo (requiere npm run 
 - Alta de tienda con giro, tipo de vendedor (persona física o moral), razón social, RFC,
   domicilio, teléfono, correo y política de devoluciones; queda **en revisión** hasta su activación.
 - Página pública de la tienda con portada, estadísticas, productos, vendidos, «sobre la tienda»
-  y ficha de **Información del vendedor** con los datos fiscales.
+  y ficha de **Información del vendedor**. El domicilio completo **no se publica** por omisión
+  (muchos negocios operan desde su casa): en público sólo aparecen municipio, estado y C.P., y el
+  domicilio fiscal completo se entrega a quien compra dentro de su pedido.
 - Productos con **inventario** y **variantes** (talla, color, presentación) con existencias y SKU
   independientes; el inventario se descuenta al pagar y se restituye si se cancela.
 - Compra de **varias piezas** en un mismo pedido, con selector de variante y cantidad.
@@ -108,8 +110,10 @@ npm run test:e2e   # prueba end-to-end del recorrido completo (requiere npm run 
 - **Colectivos**: mercados, corredores comerciales o alianzas de oficio con página y escaparate común.
 - **Paquetes cruzados**: productos de varias tiendas en un paquete; quien compra uno recibe un cupón
   para las demás tiendas del paquete.
-- **Adelanto de ventas**: cobra hasta el 70 % de las ventas en curso con 5 % de comisión; se amortiza
-  automáticamente conforme se completan esas ventas.
+- **Adelanto de ventas con análisis de riesgo**: el límite depende del historial (40 %, 55 % o 70 %
+  de las ventas en curso, con tope por operación), exige ventas completadas, antigüedad, pocas
+  cancelaciones e identidad verificada, informa el **CAT aproximado** y marca el adelanto como
+  vencido si no se amortiza en el plazo. Se descuenta solo conforme se completan las ventas.
 - **Importar y exportar catálogo (CSV)**: alta masiva por SKU con variantes, plantilla descargable y
   exportación del catálogo completo.
 

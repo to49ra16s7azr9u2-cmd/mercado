@@ -3,7 +3,9 @@
 import { useActionState, useState } from "react";
 import { SubmitButton } from "./SubmitButton";
 import type { ActionState } from "@/lib/actions";
-import { ADVANCE_FEE_RATE, ADVANCE_MAX_RATE, ADVANCE_MIN, CONSOLIDATED_UNIT_COST, CSV_TEMPLATE_EXAMPLE, REGIONS, SHIPPING_METHODS } from "@/lib/constants";
+import {
+  ADVANCE_MIN, CONSOLIDATED_UNIT_COST, CSV_TEMPLATE_EXAMPLE, REGIONS, SHIPPING_METHODS,
+} from "@/lib/constants";
 import { money } from "@/lib/format";
 
 type Action = (state: ActionState, form: FormData) => Promise<ActionState>;
@@ -289,48 +291,115 @@ export function BundleForm({
 export function AdvanceForm({
   action,
   pending,
-  max,
+  limit,
+  apr,
+  feeRate,
+  horizonDays,
+  tierLabel,
+  dueDays,
 }: {
   action: Action;
   pending: number;
-  max: number;
+  limit: number;
+  apr: number;
+  feeRate: number;
+  horizonDays: number;
+  tierLabel: string;
+  dueDays: number;
 }) {
   const [state, formAction] = useActionState(action, {});
-  const [amount, setAmount] = useState(Math.min(max, Math.max(ADVANCE_MIN, Math.round(max / 2))));
-  const fee = Math.round(amount * ADVANCE_FEE_RATE);
+  const [amount, setAmount] = useState(
+    Math.min(limit, Math.max(ADVANCE_MIN, Math.round(limit / 2 / 100) * 100)),
+  );
+  const fee = Math.round(amount * feeRate);
 
   return (
     <form action={formAction} className="card space-y-3 p-4">
       <Feedback state={state} />
       <h2 className="section-title">Solicitar adelanto</h2>
       <p className="text-xs text-muted">
-        Puedes adelantar hasta el {ADVANCE_MAX_RATE * 100} % de tus ventas en curso ({money(pending)}).
-        El adelanto se descuenta automáticamente conforme se completan esas ventas.
+        Nivel <b>{tierLabel}</b>: puedes adelantar hasta {money(limit)} de tus {money(pending)} en
+        ventas en curso. Tus ventas tardan en promedio {horizonDays} días en cerrarse.
       </p>
+
       <div>
-        <label className="label" htmlFor="amount">Monto (máximo {money(max)})</label>
+        <label className="label" htmlFor="amount">Monto (entre {money(ADVANCE_MIN)} y {money(limit)})</label>
         <input
           id="amount"
           name="amount"
           type="range"
           min={ADVANCE_MIN}
-          max={Math.max(ADVANCE_MIN, max)}
+          max={Math.max(ADVANCE_MIN, limit)}
           step={100}
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value))}
           className="w-full accent-[#06c755]"
-          disabled={max < ADVANCE_MIN}
         />
       </div>
+
       <dl className="divide-y divide-line rounded-lg bg-canvas px-3 text-sm">
-        <div className="flex justify-between py-2"><dt className="text-muted">Recibes hoy</dt><dd className="font-black text-brand-darker">{money(amount)}</dd></div>
-        <div className="flex justify-between py-2"><dt className="text-muted">Comisión ({ADVANCE_FEE_RATE * 100} %)</dt><dd className="font-bold">{money(fee)}</dd></div>
-        <div className="flex justify-between py-2"><dt className="text-muted">Se descontará de tus ventas</dt><dd className="font-bold">{money(amount + fee)}</dd></div>
+        <div className="flex justify-between py-2">
+          <dt className="text-muted">Recibes hoy</dt>
+          <dd className="font-black text-brand-darker">{money(amount)}</dd>
+        </div>
+        <div className="flex justify-between py-2">
+          <dt className="text-muted">Comisión ({Math.round(feeRate * 100)} % del monto)</dt>
+          <dd className="font-bold">{money(fee)}</dd>
+        </div>
+        <div className="flex justify-between py-2">
+          <dt className="text-muted">Total a descontar de tus ventas</dt>
+          <dd className="font-bold">{money(amount + fee)}</dd>
+        </div>
+        <div className="flex justify-between py-2">
+          <dt className="text-muted">
+            <b>CAT aproximado</b> (costo anual total, sin IVA)
+          </dt>
+          <dd className="font-black">{apr} %</dd>
+        </div>
+        <div className="flex justify-between py-2">
+          <dt className="text-muted">Plazo máximo</dt>
+          <dd className="font-bold">{dueDays} días</dd>
+        </div>
       </dl>
-      <SubmitButton className="btn-primary w-full" disabled={max < ADVANCE_MIN}>
-        Solicitar adelanto
-      </SubmitButton>
+
+      <div className="rounded-lg border border-line bg-white p-3 text-[11px] leading-relaxed text-muted">
+        El <b>CAT</b> te permite comparar este adelanto con un crédito bancario: aunque la comisión
+        es del {Math.round(feeRate * 100)} %, al cobrarse en un plazo corto equivale a un costo anual
+        de <b>{apr} %</b>. Si tus ventas no se completan antes de {dueDays} días, el adelanto se marca
+        como vencido y no podrás solicitar otro hasta liquidarlo. Esto no es un producto financiero
+        real: es una demostración.
+      </div>
+
+      <label className="flex items-start gap-2 text-xs">
+        <input type="checkbox" name="acepta_costo" required className="mt-0.5 accent-[#06c755]" />
+        <span>
+          Entiendo que pagaré {money(fee)} de comisión (CAT aproximado {apr} %) y que el monto se
+          descontará automáticamente de mis ventas.
+        </span>
+      </label>
+
+      <SubmitButton className="btn-primary w-full">Solicitar adelanto</SubmitButton>
     </form>
+  );
+}
+
+export function AdvanceRequirements({
+  checks,
+}: {
+  checks: { label: string; ok: boolean; detail: string }[];
+}) {
+  return (
+    <ul className="card divide-y divide-line text-sm">
+      {checks.map((check) => (
+        <li key={check.label} className="flex items-center gap-3 p-3">
+          <span aria-hidden className={check.ok ? "text-brand" : "text-muted"}>
+            {check.ok ? "✅" : "⬜"}
+          </span>
+          <span className="min-w-0 flex-1">{check.label}</span>
+          <span className="shrink-0 text-xs text-muted">{check.detail}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

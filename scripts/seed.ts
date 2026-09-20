@@ -387,9 +387,10 @@ for (const a of users.slice(1)) {
 
 const insertShop = db.prepare(
   `INSERT INTO shops (id, owner_id, name, slug, description, category, logo_seed, cover_emoji,
-    business_type, legal_name, rfc, legal_address, legal_phone, legal_email, return_policy,
-    delivery_note, ship_from, specialty, sourcing_needs, is_producer, status, created_at)
-   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?)`,
+    business_type, legal_name, rfc, legal_address, legal_zip, legal_city, legal_region,
+    address_public, legal_phone, legal_email, return_policy, delivery_note, ship_from,
+    specialty, sourcing_needs, is_producer, status, created_at)
+   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?)`,
 );
 const insertVariant = db.prepare(
   "INSERT INTO item_variants (item_id, label, sku, stock, position) VALUES (?,?,?,?,?)",
@@ -487,7 +488,8 @@ for (const shop of SHOPS) {
   insertShop.run(
     shopId, owner.id, shop.name, slug, shop.description, shop.category,
     String(shop.owner % 12), shop.emoji, "persona_moral", shop.legal, shop.rfc,
-    `Av. ${pick(["Insurgentes", "Universidad", "Constitución", "Juárez"])} ${int(100, 1800)}, Col. ${pick(COLONIAS)}, ${CITIES[shop.region]}, ${shop.region}, C.P. ${String(int(1000, 97999)).padStart(5, "0")}`,
+    `Av. ${pick(["Insurgentes", "Universidad", "Constitución", "Juárez"])} ${int(100, 1800)}, Col. ${pick(COLONIAS)}`,
+    String(int(1000, 97999)).padStart(5, "0"), CITIES[shop.region], shop.region, 0,
     `${pick(["55", "33", "81", "222"])}${int(1000000, 9999999)}`,
     `contacto@${slug}.mx`,
     "Aceptamos cambios por talla dentro de los 15 días naturales posteriores a la entrega.",
@@ -688,8 +690,9 @@ const insertShipment = db.prepare(
    VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
 );
 const insertAdvance = db.prepare(
-  `INSERT INTO advances (id, shop_id, user_id, amount, fee, outstanding, status, created_at)
-   VALUES (?,?,?,?,?,?,'active',?)`,
+  `INSERT INTO advances (id, shop_id, user_id, amount, fee, outstanding, fee_rate, apr,
+    horizon_days, due_at, tier, status, created_at, closed_at)
+   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 );
 
 // 1) Precios de mayoreo: cada tienda ofrece volumen en sus productos propios
@@ -793,7 +796,7 @@ insertMember.run(collectiveIds[1], tonantzin.id, "member", daysAgo(12));
 }
 
 // 5.b) Pedidos pagados pendientes de envío (para consolidar y para el adelanto)
-for (const [shop, count] of [[xanath, 3], [tonantzin, 3]] as const) {
+for (const [shop, count] of [[xanath, 3], [tonantzin, 8]] as const) {
   for (let i = 0; i < count; i++) {
     const product = shop.items[i % shop.items.length];
     const buyer = users[(i + 3) % users.length];
@@ -805,6 +808,16 @@ for (const [shop, count] of [[xanath, 3], [tonantzin, 3]] as const) {
       shopId: shop.id, quantity: int(1, 2), variantLabel: variantRow?.label,
     });
   }
+}
+
+// 5.c) Historial de ventas cerradas para la tienda que ofrece el adelanto en la demo
+for (let i = 0; i < 3; i++) {
+  const product = tonantzin.items[i % tonantzin.items.length];
+  const buyer = users[(i + 6) % users.length];
+  if (buyer.id === tonantzin.ownerId) continue;
+  makeOrder(product, buyer.id, "done", int(20, 70), {
+    shopId: tonantzin.id, quantity: int(1, 2),
+  });
 }
 
 // 6) Envío consolidado de una tienda
@@ -823,22 +836,19 @@ for (const [shop, count] of [[xanath, 3], [tonantzin, 3]] as const) {
   }
 }
 
-// 7) Adelanto de ventas activo
+// 7) Historial de adelantos: uno ya amortizado (Casa Sol) para mostrar el producto sin dejar
+//    a nadie endeudado; las tiendas con historial pueden solicitar uno nuevo en la demo.
 {
-  const pendingTotal = (db.prepare(
-    "SELECT COALESCE(SUM(payout), 0) AS total FROM orders WHERE shop_id = ? AND status IN ('paid','shipped','received')",
-  ).get(tonantzin.id) as { total: number }).total;
-  const amount = Math.min(
-    Math.floor(pendingTotal * 0.7),
-    Math.max(500, Math.round((pendingTotal * 0.4) / 100) * 100),
+  const amount = 3000;
+  const fee = Math.round(amount * 0.05);
+  const horizon = 21;
+  const apr = Math.round(0.05 * (365 / horizon) * 1000) / 10;
+  insertAdvance.run(
+    id("ad_"), casaSol.id, casaSol.ownerId, amount, fee, 0, 0.05, apr, horizon,
+    daysAgo(-20), "inicial", "repaid", daysAgo(55), daysAgo(20),
   );
-  if (amount >= 500) {
-    const fee = Math.round(amount * 0.05);
-    insertAdvance.run(id("ad_"), tonantzin.id, tonantzin.ownerId, amount, fee, amount + fee, daysAgo(6));
-    insertLedger.run(id("l_"), tonantzin.ownerId, "balance", amount,
-      `Adelanto sobre ventas en curso (comisión $${fee})`, daysAgo(6));
-    db.prepare("UPDATE users SET balance = balance + ? WHERE id = ?").run(amount, tonantzin.ownerId);
-  }
+  insertLedger.run(id("l_"), casaSol.ownerId, "balance", amount,
+    `Adelanto sobre ventas en curso · comisión $${fee} · CAT aproximado ${apr} %`, daysAgo(55));
 }
 
 /* ------------------------- cupones, puntos y avisos ------------------------ */

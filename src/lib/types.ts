@@ -77,6 +77,10 @@ export type Shop = {
   legal_name: string;
   rfc: string;
   legal_address: string;
+  legal_zip: string;
+  legal_city: string;
+  legal_region: string;
+  address_public: number;
   legal_phone: string;
   legal_email: string;
   return_policy: string;
@@ -149,7 +153,12 @@ export type Advance = {
   amount: number;
   fee: number;
   outstanding: number;
-  status: "active" | "repaid";
+  fee_rate: number;
+  apr: number;
+  horizon_days: number;
+  due_at: string | null;
+  tier: string;
+  status: "active" | "repaid" | "overdue";
   created_at: string;
   closed_at: string | null;
 };

@@ -21,6 +21,7 @@ export function ShopForm({
   shop?: {
     name: string; description: string; category: string; cover_emoji: string; logo_seed: string;
     business_type: string; legal_name: string; rfc: string; legal_address: string;
+    legal_zip?: string; legal_city?: string; legal_region?: string; address_public?: number;
     legal_phone: string; legal_email: string; return_policy: string; delivery_note: string;
     ship_from: string; specialty?: string; sourcing_needs?: string; is_producer?: number;
   };
@@ -144,10 +145,41 @@ export function ShopForm({
               placeholder="XAXX010101000" />
           </div>
           <div className="sm:col-span-2">
-            <label className="label" htmlFor="legal_address">Domicilio fiscal o comercial *</label>
+            <label className="label" htmlFor="legal_address">Calle, número y colonia *</label>
             <input id="legal_address" name="legal_address" defaultValue={shop?.legal_address} className="input" required
-              placeholder="Calle, número, colonia, municipio, estado y C.P." />
+              placeholder="Av. Juárez 120, int. 3, Col. Centro" />
+            <p className="mt-1 text-[11px] text-muted">
+              🔒 Este dato <b>no se publica</b>. Sólo se comparte con quien te compra (para su factura
+              o devolución) y con las autoridades que lo soliciten.
+            </p>
           </div>
+          <div>
+            <label className="label" htmlFor="legal_zip">Código postal *</label>
+            <input id="legal_zip" name="legal_zip" defaultValue={shop?.legal_zip} className="input"
+              inputMode="numeric" required placeholder="06000" />
+          </div>
+          <div>
+            <label className="label" htmlFor="legal_city">Municipio o alcaldía *</label>
+            <input id="legal_city" name="legal_city" defaultValue={shop?.legal_city} className="input" required />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="legal_region">Estado *</label>
+            <select id="legal_region" name="legal_region" defaultValue={shop?.legal_region ?? ""} className="input" required>
+              <option value="">Selecciona…</option>
+              {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" name="address_public" defaultChecked={(shop?.address_public ?? 0) === 1}
+              className="mt-0.5 accent-[#06c755]" />
+            <span>
+              Publicar mi domicilio completo en la ficha «Información del vendedor».
+              <span className="block text-[11px] text-muted">
+                No lo recomendamos si trabajas desde tu casa: de forma predeterminada sólo mostramos
+                municipio, estado y código postal, que es suficiente para el aviso al consumidor.
+              </span>
+            </span>
+          </label>
           <div>
             <label className="label" htmlFor="legal_phone">Teléfono de atención (10 dígitos) *</label>
             <input id="legal_phone" name="legal_phone" defaultValue={shop?.legal_phone} className="input"

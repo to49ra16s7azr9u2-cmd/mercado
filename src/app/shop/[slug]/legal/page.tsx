@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { currentUser } from "@/lib/auth";
 import { shopBySlug } from "@/lib/queries";
 import { businessTypeLabel, SUPPORT_EMAIL } from "@/lib/constants";
 
@@ -14,12 +15,25 @@ export default async function ShopLegalPage({ params }: { params: Promise<{ slug
   const shop = shopBySlug(slug);
   if (!shop) notFound();
 
+  const user = await currentUser();
+  const isOwner = user?.id === shop.owner_id;
+  const locality = [shop.legal_city, shop.legal_region].filter(Boolean).join(", ");
+  const publicAddress = [locality, shop.legal_zip ? `C.P. ${shop.legal_zip}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  const showsFull = shop.address_public === 1 || isOwner;
+
   const rows: [string, string][] = [
     ["Nombre comercial", shop.name],
     ["Nombre o razón social", shop.legal_name],
     ["Tipo de vendedor", businessTypeLabel(shop.business_type)],
     ["RFC", shop.rfc],
-    ["Domicilio fiscal o comercial", shop.legal_address],
+    [
+      "Domicilio",
+      showsFull
+        ? [shop.legal_address, publicAddress].filter(Boolean).join(", ")
+        : publicAddress || "Sin especificar",
+    ],
     ["Teléfono de atención", shop.legal_phone],
     ["Correo de atención", shop.legal_email],
     ["Giro", shop.category],
@@ -41,6 +55,20 @@ export default async function ShopLegalPage({ params }: { params: Promise<{ slug
         Datos publicados por la tienda conforme a la Ley Federal de Protección al Consumidor y a las
         Disposiciones de comercio electrónico. Ante cualquier duda puedes escribir a {SUPPORT_EMAIL}.
       </p>
+      {!showsFull && (
+        <p className="mt-3 rounded-lg bg-brand-soft px-4 py-3 text-sm text-brand-darker">
+          🔒 Por seguridad de quien vende —muchos negocios operan desde su domicilio particular— aquí
+          se muestra sólo la localidad. El domicilio completo se entrega a quien compra al concretar
+          un pedido (para su factura, cambio o devolución) y a la autoridad que lo requiera.
+        </p>
+      )}
+      {isOwner && !shop.address_public && (
+        <p className="mt-3 rounded-lg bg-canvas px-4 py-3 text-xs text-muted">
+          Estás viendo tu domicilio completo porque es tu tienda; el público sólo ve{" "}
+          <b>{publicAddress || "la localidad"}</b>.{" "}
+          <Link href="/mypage/shop/settings" className="link">Cambiar esta preferencia</Link>
+        </p>
+      )}
       <dl className="card mt-5 divide-y divide-line text-sm">
         {rows.map(([label, value]) => (
           <div key={label} className="gap-4 p-4 sm:flex">

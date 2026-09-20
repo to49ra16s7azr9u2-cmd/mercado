@@ -405,10 +405,39 @@ export const CONSOLIDATED_UNIT_COST: Record<string, number> = {
   paqueteria: 59,
 };
 
-/** Adelanto de saldo sobre ventas en curso. */
+/**
+ * Adelanto de saldo sobre ventas en curso.
+ * La comisión es fija por operación, pero se informa siempre su costo anual
+ * equivalente (CAT aproximado) para que se pueda comparar con otros créditos.
+ */
 export const ADVANCE_FEE_RATE = 0.05;
-export const ADVANCE_MAX_RATE = 0.7;
 export const ADVANCE_MIN = 500;
+/** Tope absoluto por operación, para que un negocio pequeño no se sobreendeude. */
+export const ADVANCE_MAX_AMOUNT = 20_000;
+/** Plazo máximo antes de considerar el adelanto vencido. */
+export const ADVANCE_DUE_DAYS = 60;
+/** Horizonte por defecto si la tienda aún no tiene ventas completadas. */
+export const ADVANCE_DEFAULT_HORIZON = 30;
+
+/** Escalones de riesgo: a más historial y mejor cumplimiento, mayor porcentaje. */
+export const ADVANCE_TIERS = [
+  { key: "inicial", label: "Inicial", rate: 0.4, minCompleted: 3 },
+  { key: "establecida", label: "Establecida", rate: 0.55, minCompleted: 10 },
+  { key: "consolidada", label: "Consolidada", rate: 0.7, minCompleted: 25 },
+] as const;
+
+/** Requisitos mínimos para poder solicitar un adelanto. */
+export const ADVANCE_REQUIREMENTS = {
+  minCompletedOrders: 3,
+  minShopAgeDays: 30,
+  maxCancellationRate: 0.2,
+  requiresVerifiedIdentity: true,
+} as const;
+
+export function advanceApr(feeRate: number, horizonDays: number): number {
+  const days = Math.max(7, horizonDays);
+  return Math.round(feeRate * (365 / days) * 1000) / 10; // porcentaje con un decimal
+}
 
 export const PARTNER_STATUS: Record<string, { label: string; className: string }> = {
   pending: { label: "Solicitud enviada", className: "bg-canvas text-muted" },

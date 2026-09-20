@@ -7,10 +7,11 @@ import { createSession, currentUser, destroySession, hashPassword, verifyPasswor
 import { ledgerEntry, notify } from "./notify";
 import { saveImage } from "./upload";
 import {
-  ADVANCE_FEE_RATE, ADVANCE_MAX_RATE, ADVANCE_MIN, B2B_FEE_RATE, B2B_MIN_QTY, CASH_FEE,
-  CONSOLIDATED_UNIT_COST, FEE_RATE, MAX_PRICE, MIN_PAYOUT, MIN_PRICE, MSI_MIN, PAYOUT_FEE,
-  shippingCostOf,
+  ADVANCE_DUE_DAYS, ADVANCE_FEE_RATE, ADVANCE_MIN, advanceApr, B2B_FEE_RATE, B2B_MIN_QTY,
+  CASH_FEE, CONSOLIDATED_UNIT_COST, FEE_RATE, MAX_PRICE, MIN_PAYOUT, MIN_PRICE, MSI_MIN,
+  PAYOUT_FEE, shippingCostOf,
 } from "./constants";
+import { advanceEligibility } from "./queries";
 import type { Item, Shipment, Shop, User } from "./types";
 
 export type ActionState = { error?: string; ok?: string };
@@ -595,8 +596,9 @@ export async function rateBuyerAction(_prev: ActionState, form: FormData): Promi
       run("UPDATE items SET status = 'sold', updated_at = ? WHERE id = ?", [nowIso(), order.item_id]);
     }
     const advance = order.shop_id
-      ? get<{ id: string; outstanding: number }>(
-          "SELECT id, outstanding FROM advances WHERE shop_id = ? AND status = 'active' LIMIT 1",
+      ? get<{ id: string; outstanding: number; status: string }>(
+          `SELECT id, outstanding, status FROM advances WHERE shop_id = ?
+             AND status IN ('active','overdue') ORDER BY created_at LIMIT 1`,
           [order.shop_id],
         )
       : undefined;
@@ -611,7 +613,8 @@ export async function rateBuyerAction(_prev: ActionState, form: FormData): Promi
       const outstanding = advance.outstanding - repayment;
       run("UPDATE advances SET outstanding = ?, status = ?, closed_at = ? WHERE id = ?", [
         outstanding,
-        outstanding <= 0 ? "repaid" : "active",
+        // un adelanto vencido sigue vencido mientras quede saldo por amortizar
+        outstanding <= 0 ? "repaid" : advance.status,
         outstanding <= 0 ? nowIso() : null,
         advance.id,
       ]);
@@ -921,6 +924,10 @@ export async function createShopAction(_prev: ActionState, form: FormData): Prom
   const legalName = String(form.get("legal_name") ?? "").trim();
   const rfc = String(form.get("rfc") ?? "").trim().toUpperCase();
   const legalAddress = String(form.get("legal_address") ?? "").trim();
+  const legalZip = String(form.get("legal_zip") ?? "").trim();
+  const legalCity = String(form.get("legal_city") ?? "").trim();
+  const legalRegion = String(form.get("legal_region") ?? "").trim();
+  const addressPublic = form.get("address_public") ? 1 : 0;
   const legalPhone = String(form.get("legal_phone") ?? "").replace(/\s+/g, "");
   const legalEmail = String(form.get("legal_email") ?? "").trim().toLowerCase();
   const returnPolicy = String(form.get("return_policy") ?? "").trim();
@@ -934,17 +941,21 @@ export async function createShopAction(_prev: ActionState, form: FormData): Prom
     return { error: "El RFC no tiene un formato válido (ej. XAXX010101000)." };
   if (!/^\d{10}$/.test(legalPhone)) return { error: "El teléfono debe tener 10 dígitos." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(legalEmail)) return { error: "El correo de contacto no es válido." };
-  if (!legalAddress) return { error: "Indica el domicilio fiscal o comercial." };
+  if (!legalAddress) return { error: "Indica la calle y número del domicilio fiscal." };
+  if (!/^\d{5}$/.test(legalZip)) return { error: "El código postal debe tener 5 dígitos." };
+  if (!legalCity || !legalRegion) return { error: "Indica el municipio o alcaldía y el estado." };
 
   const shopId = newId("sh_");
   run(
     `INSERT INTO shops (id, owner_id, name, slug, description, category, logo_seed, cover_emoji,
-      business_type, legal_name, rfc, legal_address, legal_phone, legal_email, return_policy,
-      delivery_note, ship_from, specialty, sourcing_needs, is_producer, status, created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?)`,
+      business_type, legal_name, rfc, legal_address, legal_zip, legal_city, legal_region,
+      address_public, legal_phone, legal_email, return_policy, delivery_note, ship_from,
+      specialty, sourcing_needs, is_producer, status, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?)`,
     [shopId, user.id, name, slugifyShop(name), description, category,
      String(Math.floor(Math.random() * 12)), String(form.get("cover_emoji") ?? "🛍️"),
-     businessType, legalName, rfc, legalAddress, legalPhone, legalEmail, returnPolicy,
+     businessType, legalName, rfc, legalAddress, legalZip, legalCity, legalRegion, addressPublic,
+     legalPhone, legalEmail, returnPolicy,
      deliveryNote, shipFrom, String(form.get("specialty") ?? "").trim(),
      String(form.get("sourcing_needs") ?? "").trim(), form.get("is_producer") ? 1 : 0, nowIso()],
   );
@@ -969,15 +980,20 @@ export async function updateShopAction(_prev: ActionState, form: FormData): Prom
   if (name.length < 3) return { error: "El nombre de la tienda debe tener al menos 3 caracteres." };
   if (!/^\d{10}$/.test(legalPhone)) return { error: "El teléfono debe tener 10 dígitos." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(legalEmail)) return { error: "El correo de contacto no es válido." };
+  if (!/^\d{5}$/.test(String(form.get("legal_zip") ?? "").trim()))
+    return { error: "El código postal debe tener 5 dígitos." };
 
   run(
     `UPDATE shops SET name=?, description=?, category=?, cover_emoji=?, logo_seed=?, business_type=?,
-      legal_name=?, rfc=?, legal_address=?, legal_phone=?, legal_email=?, return_policy=?,
+      legal_name=?, rfc=?, legal_address=?, legal_zip=?, legal_city=?, legal_region=?,
+      address_public=?, legal_phone=?, legal_email=?, return_policy=?,
       delivery_note=?, ship_from=?, specialty=?, sourcing_needs=?, is_producer=? WHERE id = ?`,
     [name, String(form.get("description") ?? "").trim(), String(form.get("category") ?? ""),
      String(form.get("cover_emoji") ?? shop.cover_emoji), String(form.get("logo_seed") ?? shop.logo_seed),
      String(form.get("business_type") ?? shop.business_type), String(form.get("legal_name") ?? "").trim(),
      String(form.get("rfc") ?? "").trim().toUpperCase(), String(form.get("legal_address") ?? "").trim(),
+     String(form.get("legal_zip") ?? "").trim(), String(form.get("legal_city") ?? "").trim(),
+     String(form.get("legal_region") ?? "").trim(), form.get("address_public") ? 1 : 0,
      legalPhone, legalEmail, String(form.get("return_policy") ?? "").trim(),
      String(form.get("delivery_note") ?? "").trim(), String(form.get("ship_from") ?? "").trim(),
      String(form.get("specialty") ?? "").trim(), String(form.get("sourcing_needs") ?? "").trim(),
@@ -1655,50 +1671,48 @@ export async function deleteBundleAction(formData: FormData) {
 export async function requestAdvanceAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const { user, shop } = await myShop();
   if (!shop) return { error: "Necesitas una tienda para solicitar un adelanto." };
-  if (get("SELECT 1 AS x FROM advances WHERE shop_id = ? AND status = 'active'", [shop.id]))
-    return { error: "Ya tienes un adelanto activo. Se descuenta de tus ventas al cerrarse." };
 
-  const pending = get<{ total: number }>(
-    `SELECT COALESCE(SUM(payout), 0) AS total FROM orders
-     WHERE shop_id = ? AND status IN ('paid', 'shipped', 'received')`,
-    [shop.id],
-  )?.total ?? 0;
-  const max = Math.floor(pending * ADVANCE_MAX_RATE);
+  const fresh = get<User>("SELECT * FROM users WHERE id = ?", [user.id])!;
+  const eligibility = advanceEligibility(shop, fresh);
+  if (!eligibility.eligible)
+    return { error: `No podemos adelantarte ahora mismo: ${eligibility.blockers.join(" · ")}.` };
+
   const amount = Math.round(Number(form.get("amount")) || 0);
-
-  if (max < ADVANCE_MIN)
-    return { error: `Necesitas al menos $${Math.ceil(ADVANCE_MIN / ADVANCE_MAX_RATE)} en ventas en curso.` };
   if (amount < ADVANCE_MIN) return { error: `El adelanto mínimo es de $${ADVANCE_MIN}.` };
-  if (amount > max) return { error: `Puedes adelantar hasta $${max} (70 % de tus ventas en curso).` };
+  if (amount > eligibility.limit)
+    return {
+      error: `Puedes adelantar hasta $${eligibility.limit} (${Math.round(eligibility.tier.rate * 100)} % de tus ventas en curso según tu historial).`,
+    };
+  if (!form.get("acepta_costo"))
+    return { error: "Confirma que entiendes el costo del adelanto antes de continuar." };
 
   const fee = Math.round(amount * ADVANCE_FEE_RATE);
+  const dueAt = new Date(Date.now() + ADVANCE_DUE_DAYS * 86400000).toISOString();
+  const apr = advanceApr(ADVANCE_FEE_RATE, eligibility.horizonDays);
+
   tx(() => {
     run(
-      `INSERT INTO advances (id, shop_id, user_id, amount, fee, outstanding, status, created_at)
-       VALUES (?,?,?,?,?,?,'active',?)`,
-      [newId("ad_"), shop.id, user.id, amount, fee, amount + fee, nowIso()],
+      `INSERT INTO advances (id, shop_id, user_id, amount, fee, outstanding, fee_rate, apr,
+        horizon_days, due_at, tier, status, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,'active',?)`,
+      [newId("ad_"), shop.id, user.id, amount, fee, amount + fee, ADVANCE_FEE_RATE, apr,
+       eligibility.horizonDays, dueAt, eligibility.tier.key, nowIso()],
     );
     run("UPDATE users SET balance = balance + ? WHERE id = ?", [amount, user.id]);
-    ledgerEntry(user.id, "balance", amount, `Adelanto sobre ventas en curso (comisión $${fee})`);
+    ledgerEntry(user.id, "balance", amount,
+      `Adelanto sobre ventas en curso · comisión $${fee} · CAT aproximado ${apr} %`);
   });
 
   notify({
     userId: user.id, kind: "shop", title: "Adelanto depositado",
-    body: `Recibiste $${amount}. Se descontará de tus ventas conforme se completen.`,
+    body: `Recibiste $${amount}. Se descontarán $${amount + fee} de tus ventas conforme se completen.`,
     link: "/mypage/shop/financing",
   });
   revalidatePath("/mypage/shop/financing");
   revalidatePath("/mypage/balance");
-  return { ok: `Adelanto de $${amount} depositado en tu saldo (comisión $${fee}).` };
+  return { ok: `Adelanto de $${amount} depositado (comisión $${fee}, CAT aproximado ${apr} %).` };
 }
 
-/* ================= Especialización: surtir y revender con crédito ============ */
-
-/**
- * Publica en mi tienda un producto que compré en mayoreo, conservando el crédito
- * de quien lo produce. Así cada negocio puede especializarse en lo que hace mejor
- * y surtir el resto con tiendas aliadas.
- */
 export async function listSourcedItemAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const { user, shop } = await myShop();
   if (!shop) return { error: "Primero abre tu tienda." };

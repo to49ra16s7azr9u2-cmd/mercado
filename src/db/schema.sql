@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS shops (
   legal_name     TEXT NOT NULL DEFAULT '',
   rfc            TEXT NOT NULL DEFAULT '',
   legal_address  TEXT NOT NULL DEFAULT '',
+  legal_zip      TEXT NOT NULL DEFAULT '',
+  legal_city     TEXT NOT NULL DEFAULT '',
+  legal_region   TEXT NOT NULL DEFAULT '',
+  address_public INTEGER NOT NULL DEFAULT 0,
   legal_phone    TEXT NOT NULL DEFAULT '',
   legal_email    TEXT NOT NULL DEFAULT '',
   return_policy  TEXT NOT NULL DEFAULT '',
@@ -385,15 +389,20 @@ CREATE INDEX IF NOT EXISTS idx_bundle_items_item ON bundle_items(item_id);
 
 -- Adelanto de saldo sobre ventas en curso
 CREATE TABLE IF NOT EXISTS advances (
-  id          TEXT PRIMARY KEY,
-  shop_id     TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  amount      INTEGER NOT NULL,
-  fee         INTEGER NOT NULL DEFAULT 0,
-  outstanding INTEGER NOT NULL DEFAULT 0,
-  status      TEXT NOT NULL DEFAULT 'active',
-  created_at  TEXT NOT NULL,
-  closed_at   TEXT
+  id            TEXT PRIMARY KEY,
+  shop_id       TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount        INTEGER NOT NULL,
+  fee           INTEGER NOT NULL DEFAULT 0,
+  outstanding   INTEGER NOT NULL DEFAULT 0,
+  fee_rate      REAL NOT NULL DEFAULT 0,
+  apr           REAL NOT NULL DEFAULT 0,
+  horizon_days  INTEGER NOT NULL DEFAULT 30,
+  due_at        TEXT,
+  tier          TEXT NOT NULL DEFAULT '',
+  status        TEXT NOT NULL DEFAULT 'active',
+  created_at    TEXT NOT NULL,
+  closed_at     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_advances_shop ON advances(shop_id);
 

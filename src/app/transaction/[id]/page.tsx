@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
-import { itemById, orderById, orderMessages, orderReviews, userById } from "@/lib/queries";
+import { itemById, orderById, orderMessages, orderReviews, shopById, userById } from "@/lib/queries";
 import {
   cancelOrderAction, confirmReceiptAction, rateBuyerAction, sendMessageAction, shipOrderAction,
 } from "@/lib/actions";
@@ -38,6 +38,7 @@ export default async function TransactionPage({
   const myReview = reviews.find((r) => r.rater_id === user.id);
   const theirReview = reviews.find((r) => r.ratee_id === user.id);
   const cancelled = order.status === "cancelled";
+  const sellerShop = order.shop_id ? shopById(order.shop_id) : undefined;
   const stepIndex = ORDER_STEPS.findIndex((s) => s.value === order.status);
 
   return (
@@ -162,6 +163,33 @@ export default async function TransactionPage({
           </div>
         </section>
       </div>
+
+      {sellerShop && isBuyer && (
+        <section className="card mt-4 p-4">
+          <h2 className="section-title">Datos fiscales de la tienda</h2>
+          <p className="mt-1 text-[11px] text-muted">
+            Te los compartimos por tu compra, para tu factura, cambio o devolución. No los publiques
+            ni los uses para otro fin.
+          </p>
+          <dl className="mt-3 space-y-1.5 text-sm">
+            <div className="flex gap-4"><dt className="w-40 shrink-0 text-muted">Razón social</dt><dd>{sellerShop.legal_name || sellerShop.name}</dd></div>
+            <div className="flex gap-4"><dt className="w-40 shrink-0 text-muted">RFC</dt><dd>{sellerShop.rfc || "—"}</dd></div>
+            <div className="flex gap-4">
+              <dt className="w-40 shrink-0 text-muted">Domicilio</dt>
+              <dd>
+                {[sellerShop.legal_address, sellerShop.legal_city, sellerShop.legal_region,
+                  sellerShop.legal_zip ? `C.P. ${sellerShop.legal_zip}` : ""]
+                  .filter(Boolean).join(", ") || "—"}
+              </dd>
+            </div>
+            <div className="flex gap-4"><dt className="w-40 shrink-0 text-muted">Atención</dt><dd>{sellerShop.legal_phone} · {sellerShop.legal_email}</dd></div>
+            <div className="flex gap-4"><dt className="w-40 shrink-0 text-muted">Devoluciones</dt><dd>{sellerShop.return_policy || "Según la Ley Federal de Protección al Consumidor."}</dd></div>
+          </dl>
+          <p className="mt-3 text-xs text-muted">
+            <Link href={`/shop/${sellerShop.slug}/legal`} className="link">Ver la ficha pública del vendedor</Link>
+          </p>
+        </section>
+      )}
 
       {!cancelled && (
         <div className="mt-4 space-y-4">

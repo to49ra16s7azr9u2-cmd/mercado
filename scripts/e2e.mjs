@@ -365,13 +365,53 @@ await step("consolidar envíos y marcarlos recolectados", async () => {
   await sp2.getByText("Recolectado").first().waitFor({ timeout: 25000 });
 });
 
-await step("solicitar adelanto sobre ventas en curso", async () => {
+await step("el adelanto exige historial de ventas", async () => {
   await sp2.goto(`${BASE}/mypage/shop/financing`);
-  await sp2.getByText("Ventas en curso").first().waitFor({ timeout: 20000 });
-  const form = sp2.getByRole("button", { name: "Solicitar adelanto" });
-  if (await form.isDisabled()) throw new Error("no hay ventas suficientes para el adelanto");
-  await form.click();
-  await sp2.getByText(/Adelanto de \$|Adelanto activo/).first().waitFor({ timeout: 25000 });
+  await sp2.getByText("Requisitos").first().waitFor({ timeout: 25000 });
+  const body = await sp2.innerText("body");
+  if (!body.includes("ventas completadas")) throw new Error("no se muestran los requisitos");
+  if (await sp2.getByRole("button", { name: "Solicitar adelanto" }).count())
+    throw new Error("una tienda sin historial no debería poder solicitar el adelanto");
+});
+
+await step("una tienda con historial recibe el adelanto con CAT visible", async () => {
+  await supplierPage.goto(`${BASE}/mypage/shop/financing`);
+  await supplierPage.getByText("CAT aproximado").first().waitFor({ timeout: 25000 });
+  const before = await supplierPage.innerText("body");
+  if (!/CAT aproximado/.test(before)) throw new Error("no se informa el costo anual");
+  await supplierPage.locator('input[name="acepta_costo"]').check();
+  await supplierPage.getByRole("button", { name: "Solicitar adelanto" }).click();
+  await supplierPage.waitForTimeout(2500);
+  await supplierPage.goto(`${BASE}/mypage/shop/financing`, { waitUntil: "domcontentloaded" });
+  await supplierPage.getByText("Adelanto activo").first().waitFor({ timeout: 25000 });
+  const after = await supplierPage.innerText("body");
+  if (!after.includes("Por amortizar")) throw new Error("el adelanto no quedó registrado");
+});
+
+await step("el domicilio de la tienda no se publica", async () => {
+  const db = new DB("data/mercado.db");
+  const shop = db.prepare("select legal_address, legal_city, address_public from shops where slug = ?")
+    .get(supplierSlug);
+  db.close();
+  await page.goto(`${BASE}/shop/${supplierSlug}/legal`);
+  await page.getByText("Información del vendedor").first().waitFor({ timeout: 25000 });
+  const body = await page.innerText("body");
+  if (shop.address_public) throw new Error("la tienda de prueba no debería publicar su domicilio");
+  if (body.includes(shop.legal_address))
+    throw new Error("el domicilio completo se está publicando");
+  if (!body.includes(shop.legal_city)) throw new Error("falta la localidad en el aviso");
+  if (!/sólo la localidad/.test(body)) throw new Error("falta la explicación de privacidad");
+});
+
+await step("quien compra sí recibe los datos fiscales", async () => {
+  await sp2.goto(wholesaleOrderUrl);
+  await sp2.getByText("Datos fiscales de la tienda").waitFor({ timeout: 25000 });
+  const db = new DB("data/mercado.db");
+  const shop = db.prepare("select legal_address from shops where slug = ?").get(supplierSlug);
+  db.close();
+  const body = await sp2.innerText("body");
+  if (!body.includes(shop.legal_address))
+    throw new Error("quien compró debería ver el domicilio completo");
 });
 
 await step("páginas de la red responden", async () => {

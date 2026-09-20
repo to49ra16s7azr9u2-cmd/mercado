@@ -1,5 +1,9 @@
 import "server-only";
-import { all, get } from "./db";
+import { all, get, run } from "./db";
+import {
+  ADVANCE_DEFAULT_HORIZON, ADVANCE_FEE_RATE, ADVANCE_MAX_AMOUNT, ADVANCE_MIN,
+  ADVANCE_REQUIREMENTS, ADVANCE_TIERS, advanceApr,
+} from "./constants";
 import type {
   Advance, B2bPrice, Bundle, Category, Collective, Comment, Item, ItemCard, Notification,
   Order, Shipment, Shop, ShopPartner, User, Variant,
@@ -855,10 +859,157 @@ export function advancesOf(shopId: string): Advance[] {
 }
 
 export function activeAdvance(shopId: string): Advance | undefined {
+  refreshAdvanceStatus(shopId);
   return get<Advance>(
-    "SELECT * FROM advances WHERE shop_id = ? AND status = 'active' ORDER BY created_at LIMIT 1",
+    "SELECT * FROM advances WHERE shop_id = ? AND status IN ('active', 'overdue') ORDER BY created_at LIMIT 1",
     [shopId],
   );
+}
+
+/** Marca como vencidos los adelantos que pasaron su fecha límite sin amortizarse. */
+export function refreshAdvanceStatus(shopId: string) {
+  run(
+    `UPDATE advances SET status = 'overdue'
+     WHERE shop_id = ? AND status = 'active' AND outstanding > 0 AND due_at IS NOT NULL AND due_at < ?`,
+    [shopId, new Date().toISOString()],
+  );
+}
+
+/** Historial de cumplimiento de la tienda, base del análisis de riesgo. */
+export function shopTrackRecord(shopId: string) {
+  const row = get<{
+    completed: number; cancelled: number; total: number; volume: number; first_order: string | null;
+  }>(
+    `SELECT
+       SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS completed,
+       SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+       COUNT(*) AS total,
+       COALESCE(SUM(CASE WHEN status = 'done' THEN payout ELSE 0 END), 0) AS volume,
+       MIN(created_at) AS first_order
+     FROM orders WHERE shop_id = ?`,
+    [shopId],
+  );
+  const completed = row?.completed ?? 0;
+  const cancelled = row?.cancelled ?? 0;
+  const total = row?.total ?? 0;
+
+  // Días promedio entre el pago y el cierre de la venta: es el plazo real del adelanto.
+  const closed = all<{ created_at: string; completed_at: string }>(
+    `SELECT created_at, completed_at FROM orders
+     WHERE shop_id = ? AND status = 'done' AND completed_at IS NOT NULL
+     ORDER BY completed_at DESC LIMIT 20`,
+    [shopId],
+  );
+  const horizon = closed.length
+    ? Math.max(
+        7,
+        Math.round(
+          closed.reduce(
+            (sum, o) =>
+              sum + (new Date(o.completed_at).getTime() - new Date(o.created_at).getTime()) / 86400000,
+            0,
+          ) / closed.length,
+        ),
+      )
+    : ADVANCE_DEFAULT_HORIZON;
+
+  return {
+    completed,
+    cancelled,
+    total,
+    volume: row?.volume ?? 0,
+    cancellationRate: total ? cancelled / total : 0,
+    horizonDays: horizon,
+  };
+}
+
+export type AdvanceEligibility = {
+  eligible: boolean;
+  blockers: string[];
+  checks: { label: string; ok: boolean; detail: string }[];
+  tier: { key: string; label: string; rate: number };
+  limit: number;
+  pending: number;
+  horizonDays: number;
+  apr: number;
+  feeRate: number;
+  active?: Advance;
+  record: ReturnType<typeof shopTrackRecord>;
+};
+
+/** Análisis de riesgo del adelanto: qué se puede prestar, a qué costo y por qué. */
+export function advanceEligibility(shop: Shop, user: User): AdvanceEligibility {
+  const record = shopTrackRecord(shop.id);
+  const pending = pendingSales(shop.id).total;
+  const active = activeAdvance(shop.id);
+  const shopAgeDays = Math.floor(
+    (Date.now() - new Date(shop.created_at).getTime()) / 86400000,
+  );
+
+  const tier =
+    [...ADVANCE_TIERS].reverse().find((t) => record.completed >= t.minCompleted) ?? {
+      key: "sin_historial",
+      label: "Sin historial",
+      rate: 0,
+    };
+
+  const limit = Math.min(
+    ADVANCE_MAX_AMOUNT,
+    Math.floor(pending * tier.rate),
+  );
+
+  const checks = [
+    {
+      label: `Al menos ${ADVANCE_REQUIREMENTS.minCompletedOrders} ventas completadas`,
+      ok: record.completed >= ADVANCE_REQUIREMENTS.minCompletedOrders,
+      detail: `${record.completed} completadas`,
+    },
+    {
+      label: `Tienda con ${ADVANCE_REQUIREMENTS.minShopAgeDays} días o más de operación`,
+      ok: shopAgeDays >= ADVANCE_REQUIREMENTS.minShopAgeDays,
+      detail: `${shopAgeDays} días`,
+    },
+    {
+      label: "Cancelaciones por debajo del 20 %",
+      ok: record.cancellationRate <= ADVANCE_REQUIREMENTS.maxCancellationRate,
+      detail: `${Math.round(record.cancellationRate * 100)} % de cancelaciones`,
+    },
+    {
+      label: "Identidad verificada",
+      ok: !ADVANCE_REQUIREMENTS.requiresVerifiedIdentity || !!user.is_verified,
+      detail: user.is_verified ? "verificada" : "pendiente",
+    },
+    {
+      label: "Sin adelantos activos ni vencidos",
+      ok: !active,
+      detail: active
+        ? active.status === "overdue"
+          ? "tienes un adelanto vencido"
+          : "tienes un adelanto en curso"
+        : "sin adeudos",
+    },
+    {
+      label: `Ventas en curso suficientes (mínimo $${ADVANCE_MIN} disponibles)`,
+      ok: limit >= ADVANCE_MIN,
+      detail: `$${limit} disponibles`,
+    },
+  ];
+
+  const blockers = checks.filter((c) => !c.ok).map((c) => c.label);
+
+  return {
+    eligible: blockers.length === 0,
+    blockers,
+    checks,
+    tier,
+    limit,
+    pending,
+    horizonDays: record.horizonDays,
+    apr: advanceApr(ADVANCE_FEE_RATE, record.horizonDays),
+    feeRate: ADVANCE_FEE_RATE,
+    active,
+    record,
+  };
 }
 
 /* ============================ Importación de catálogo ====================== */

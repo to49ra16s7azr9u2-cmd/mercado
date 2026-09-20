@@ -42,6 +42,15 @@ function migrate(db: DatabaseSync) {
     ["shops", "specialty", "TEXT NOT NULL DEFAULT ''"],
     ["shops", "sourcing_needs", "TEXT NOT NULL DEFAULT ''"],
     ["shops", "is_producer", "INTEGER NOT NULL DEFAULT 0"],
+    ["shops", "legal_zip", "TEXT NOT NULL DEFAULT ''"],
+    ["shops", "legal_city", "TEXT NOT NULL DEFAULT ''"],
+    ["shops", "legal_region", "TEXT NOT NULL DEFAULT ''"],
+    ["shops", "address_public", "INTEGER NOT NULL DEFAULT 0"],
+    ["advances", "fee_rate", "REAL NOT NULL DEFAULT 0"],
+    ["advances", "apr", "REAL NOT NULL DEFAULT 0"],
+    ["advances", "horizon_days", "INTEGER NOT NULL DEFAULT 30"],
+    ["advances", "due_at", "TEXT"],
+    ["advances", "tier", "TEXT NOT NULL DEFAULT ''"],
   ];
   for (const [table, column, definition] of additions) {
     const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
