@@ -40,6 +40,8 @@ export type Item = {
   ship_days: number;
   status: "on_sale" | "trading" | "sold" | "draft" | "stopped";
   offers_enabled: number;
+  shop_id: string | null;
+  stock: number;
   views: number;
   created_at: string;
   updated_at: string;
@@ -52,6 +54,41 @@ export type ItemCard = Item & {
   seller_name?: string;
   seller_handle?: string;
   seller_avatar?: string;
+  shop_name?: string | null;
+  shop_slug?: string | null;
+  shop_logo?: string | null;
+  shop_status?: string | null;
+};
+
+export type Shop = {
+  id: string;
+  owner_id: string;
+  name: string;
+  slug: string;
+  description: string;
+  category: string;
+  logo_seed: string;
+  cover_emoji: string;
+  business_type: string;
+  legal_name: string;
+  rfc: string;
+  legal_address: string;
+  legal_phone: string;
+  legal_email: string;
+  return_policy: string;
+  delivery_note: string;
+  ship_from: string;
+  status: "pending" | "active" | "suspended";
+  created_at: string;
+};
+
+export type Variant = {
+  id: number;
+  item_id: string;
+  label: string;
+  sku: string;
+  stock: number;
+  position: number;
 };
 
 export type Category = {
@@ -70,6 +107,9 @@ export type Order = {
   buyer_id: string;
   seller_id: string;
   price: number;
+  quantity: number;
+  shop_id: string | null;
+  variant_label: string;
   points_used: number;
   coupon_id: string | null;
   coupon_amount: number;

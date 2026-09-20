@@ -113,6 +113,7 @@ export function AccountMenu({
     { href: "/mypage/listings", label: "Mis artículos", icon: "🏷️" },
     { href: "/mypage/purchases", label: "Mis compras", icon: "📦" },
     { href: "/mypage/likes", label: "Favoritos", icon: "♥" },
+    { href: "/mypage/shop", label: "Mi tienda (Shops)", icon: "🏪" },
     { href: "/mypage/balance", label: "Saldo y transferencias", icon: "💶" },
     { href: "/mypage/settings", label: "Configuración", icon: "⚙️" },
   ];
@@ -140,7 +141,7 @@ export function AccountMenu({
           <div className="grid grid-cols-2 gap-2 border-b border-line p-3 text-center">
             <Link href="/mypage/balance" onClick={() => setOpen(false)} className="rounded-lg bg-canvas py-2">
               <span className="block text-[10px] font-bold text-muted">Saldo</span>
-              <span className="block text-sm font-bold text-ink">{balance} €</span>
+              <span className="block text-sm font-bold text-ink">${balance}</span>
             </Link>
             <Link href="/mypage/points" onClick={() => setOpen(false)} className="rounded-lg bg-canvas py-2">
               <span className="block text-[10px] font-bold text-muted">Puntos</span>

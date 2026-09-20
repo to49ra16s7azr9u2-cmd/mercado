@@ -1,11 +1,11 @@
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { updateProfileAction } from "@/lib/actions";
 import { ProfileForm } from "@/components/SettingsForms";
 
 export const metadata = { title: "Editar perfil" };
 
 export default async function ProfilePage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/profile");
   return (
     <>
       <h1 className="text-xl font-bold">Editar perfil</h1>

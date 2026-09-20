@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CONDITIONS, SHIPPING_PAYERS, SORTS, STATUS_FILTERS } from "@/lib/constants";
+import { CONDITIONS, SELLER_FILTERS, SHIPPING_PAYERS, SORTS, STATUS_FILTERS } from "@/lib/constants";
 import { allBrands, rootCategories, childCategories, categoryBySlug, categoryPath } from "@/lib/queries";
 import { saveSearchAction } from "@/lib/actions";
 import { SubmitButton } from "./SubmitButton";
@@ -13,6 +13,7 @@ export type ParsedSearch = {
   cond: string[];
   shipping: string;
   status: string;
+  seller: string;
   sort: string;
   page: number;
 };
@@ -38,6 +39,7 @@ export function SearchFilters({ params, loggedIn }: { params: ParsedSearch; logg
   for (const c of params.cond) query.append("cond", c);
   if (params.shipping) query.set("shipping", params.shipping);
   if (params.status && params.status !== "all") query.set("status", params.status);
+  if (params.seller && params.seller !== "all") query.set("seller", params.seller);
   if (params.sort && params.sort !== "new") query.set("sort", params.sort);
 
   return (
@@ -109,7 +111,7 @@ export function SearchFilters({ params, loggedIn }: { params: ParsedSearch; logg
         </fieldset>
 
         <fieldset className="p-4">
-          <legend className="label">Gastos de envío</legend>
+          <legend className="label">Costo de envío</legend>
           <div className="space-y-1.5">
             <label className="flex items-center gap-2 text-[13px]">
               <input type="radio" name="shipping" value="" defaultChecked={!params.shipping} className="accent-[#06c755]" />
@@ -119,6 +121,18 @@ export function SearchFilters({ params, loggedIn }: { params: ParsedSearch; logg
               <label key={s.value} className="flex items-center gap-2 text-[13px]">
                 <input type="radio" name="shipping" value={s.value} defaultChecked={params.shipping === s.value} className="accent-[#06c755]" />
                 {s.short}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="p-4">
+          <legend className="label">Tipo de vendedor</legend>
+          <div className="space-y-1.5">
+            {SELLER_FILTERS.map((s) => (
+              <label key={s.value} className="flex items-center gap-2 text-[13px]">
+                <input type="radio" name="seller" value={s.value} defaultChecked={(params.seller || "all") === s.value} className="accent-[#06c755]" />
+                {s.label}
               </label>
             ))}
           </div>

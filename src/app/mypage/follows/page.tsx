@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { followCounts, followList, isFollowing, ratingSummary } from "@/lib/queries";
 import { toggleFollowAction } from "@/lib/actions";
 import { Avatar } from "@/components/Avatar";
@@ -12,7 +12,7 @@ export default async function FollowsPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/follows");
   const { tab } = await searchParams;
   const kind = tab === "followers" ? "followers" : "following";
   const people = followList(user.id, kind);
@@ -48,7 +48,7 @@ export default async function FollowsPage({
                     {person.name}
                   </Link>
                   <p className="truncate text-xs text-muted">
-                    @{person.handle} · 😊 {rating.good} valoraciones
+                    @{person.handle} · 😊 {rating.good} calificaciones
                   </p>
                 </div>
                 <form action={toggleFollowAction}>

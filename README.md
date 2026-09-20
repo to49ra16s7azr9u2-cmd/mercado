@@ -1,80 +1,101 @@
 # Mercado
 
-Clon completo de Mercari con la identidad visual en verde LINE (`#06C755`) y **toda la
-interfaz en español**. Es una aplicación real de principio a fin: cuentas, publicación de
-artículos, búsqueda con filtros, ofertas, compra con pago retenido, mensajería de la
-transacción, valoraciones mutuas, saldo, puntos, cupones y notificaciones.
+Clon completo de Mercari **para México**, con la identidad visual en verde LINE
+(`#06C755`) y toda la interfaz en español mexicano. Es una aplicación real de principio a
+fin: cuentas, publicación de artículos, búsqueda con filtros, ofertas, compra con pago
+retenido, mensajería de la transacción, calificaciones mutuas, saldo, puntos, cupones,
+notificaciones y **Mercado Shops**, el módulo de tiendas con inventario y variantes.
 
-![Mercado](https://img.shields.io/badge/Next.js-16-black) ![Tailwind](https://img.shields.io/badge/Tailwind-4-06C755)
+![Next.js](https://img.shields.io/badge/Next.js-16-black) ![Tailwind](https://img.shields.io/badge/Tailwind-4-06C755) ![MXN](https://img.shields.io/badge/moneda-MXN-06C755)
 
 ## Puesta en marcha
 
 ```bash
 npm install
-npm run seed     # crea data/mercado.db con 13 personas y ~130 artículos de ejemplo
+npm run seed     # crea data/mercado.db con 13 personas, 4 tiendas y ~150 artículos
 npm run dev      # http://localhost:3000
 ```
 
-Cuenta de demostración: **demo@mercado.es** / **demo1234**
-(el resto de cuentas de ejemplo usan la contraseña `mercado1234`).
+> Si vuelves a ejecutar `npm run seed` con el servidor encendido, reinícialo: la conexión
+> SQLite del proceso sigue apuntando al archivo anterior.
+
+Cuenta de demostración: **demo@mercado.mx** / **demo1234**
+(las demás cuentas de ejemplo usan la contraseña `mercado1234`).
 
 Otros comandos:
 
 ```bash
-npm run build      # compilación de producción + comprobación de tipos
+npm run build      # compilación de producción + verificación de tipos
 npm start          # servidor de producción
 npm run test:e2e   # prueba end-to-end del recorrido completo (requiere npm run dev)
                    # si Chromium está en otra ruta: CHROMIUM_PATH=/ruta/chrome npm run test:e2e
 ```
 
+## Adaptación a México
+
+| Elemento | Implementación |
+| --- | --- |
+| Moneda | Peso mexicano (MXN), formato `es-MX`, precios desde $30 |
+| Territorio | Los 32 estados, municipios/alcaldías, C.P. de 5 dígitos, teléfonos de 10 dígitos |
+| Pagos | Tarjeta, **meses sin intereses** (3, 6, 9 y 12 desde $2,000), efectivo en tiendas, **SPEI**, saldo y puntos, PayPal |
+| Cobros | Transferencia a **CLABE** de 18 dígitos (mínimo $300, comisión $25) |
+| Envíos | Envío Fácil y Envío Cómodo con guía prepagada y rastreo, correo nacional, paquetería propia, entrega en persona |
+| Idioma | Español de México (playera, tenis, bolsa, chamarra, celular, computadora, carriola…) |
+| Legal | Ley Federal de Protección al Consumidor, LFPDPPP con derechos ARCO, Profeco, artículos prohibidos según la normativa mexicana |
+
 ## Funcionalidades
 
 **Cuenta y perfil**
 - Registro y acceso con sesión en cookie `httpOnly` y contraseñas con `scrypt`.
-- Perfil público (`/user/[handle]`) con artículos en venta, vendidos y valoraciones.
+- Perfil público (`/user/[handle]`) con artículos en venta, vendidos y calificaciones.
 - Edición de perfil, avatar, presentación, dirección de envío y cambio de contraseña.
-- Verificación de identidad (necesaria para transferir el saldo).
-- Seguir y dejar de seguir a otras personas, con listas de seguidos y seguidores.
+- Verificación de identidad (requisito para transferir el saldo).
+- Seguir personas, con listas de seguidos y seguidores.
 
 **Catálogo y búsqueda**
 - Portada con banners, categorías, búsquedas populares, novedades de quien sigues,
-  tendencias, envío gratis, chollos y recomendaciones según tu historial.
-- Árbol de 13 categorías con tres niveles (123 categorías en total) y menú desplegable.
-- Búsqueda por palabra clave, categoría, marca, rango de precio, estado, gastos de envío
-  y disponibilidad, con seis criterios de ordenación y paginación.
-- Búsquedas guardadas con aviso, historial de visitas y favoritos.
-- Listado de marcas y páginas de categoría con migas de pan.
+  tendencias, envío gratis, ofertas y recomendaciones según tu historial.
+- Árbol de 13 categorías en tres niveles (123 categorías) y menú desplegable.
+- Búsqueda por palabra clave, categoría, marca, rango de precio, estado, costo de envío,
+  **tipo de vendedor (persona o tienda)** y disponibilidad, con seis ordenamientos y paginación.
+- Búsquedas guardadas con aviso, historial de visitas, favoritos y directorio de marcas.
 
-**Publicación**
-- Formulario completo: fotos (subida real con vista previa o icono provisional),
-  título, descripción, categoría en cascada, marca, talla, color, estado,
-  quién paga el envío, método de envío, origen, plazo y aceptación de ofertas.
-- Cálculo en vivo de la comisión del 10 % y del importe a recibir.
+**Publicación (personas)**
+- Fotos con subida real y vista previa, categoría en cascada, marca, talla, color, estado,
+  costo de envío, método, origen, plazo y aceptación de ofertas.
+- Cálculo en vivo de la comisión del 10 % y del monto a recibir.
 - Borradores, edición, cambio rápido de precio, pausar/reanudar y eliminar.
 - Al bajar el precio se avisa a quien tiene el artículo en favoritos.
 
+**Mercado Shops (tiendas)**
+- Alta de tienda con giro, tipo de vendedor (persona física o moral), razón social, RFC,
+  domicilio, teléfono, correo y política de devoluciones; queda **en revisión** hasta su activación.
+- Página pública de la tienda con portada, estadísticas, productos, vendidos, «sobre la tienda»
+  y ficha de **Información del vendedor** con los datos fiscales.
+- Productos con **inventario** y **variantes** (talla, color, presentación) con existencias y SKU
+  independientes; el inventario se descuenta al pagar y se restituye si se cancela.
+- Compra de **varias piezas** en un mismo pedido, con selector de variante y cantidad.
+- Panel de la tienda: métricas, inventario editable en línea, pedidos por estado y envío con guía.
+- Seguir tiendas, avisos de productos nuevos, directorio `/shops` por giro y filtro de
+  «solo Mercado Shops» en la búsqueda.
+- Reglas del programa en `/legal/shops`.
+
 **Compra y transacción**
-- Ficha con galería, favoritos, comentarios públicos, ofertas (aceptar/rechazar),
-  datos de envío, vendedor con valoraciones y artículos relacionados.
-- Pago con tarjeta, saldo, puntos, cupones, Bizum, PayPal, transferencia o tienda.
-- Flujo de transacción: pago → envío con seguimiento → recepción → valoración mutua →
-  finalizada, con posibilidad de cancelar antes del envío (con reembolso).
-- Mensajería privada entre comprador y vendedor dentro de la transacción.
-- El importe de la venta se abona al saldo al cerrarse la transacción.
+- Ficha con galería, favoritos, comentarios públicos, ofertas (aceptar/rechazar) y relacionados.
+- Checkout con dirección, método de pago, MSI, puntos, cupones y desglose en vivo.
+- Flujo: pago → envío con guía → recepción → calificación mutua → finalizada, con cancelación
+  y reembolso antes del envío.
+- Mensajería privada dentro de la transacción; el monto se libera al cerrarse.
 
 **Dinero**
-- Saldo con movimientos y solicitud de transferencia por IBAN (mínimo 20 €, comisión 2 €).
-- Puntos: compra, conversión desde el saldo e historial.
-- Cupones disponibles, usados y caducados.
-- Métodos de pago: alta de tarjetas, tarjeta predeterminada y borrado.
+- Saldo con movimientos y transferencia por CLABE; puntos (compra y conversión desde saldo);
+  cupones vigentes, usados y vencidos; alta de tarjetas.
 
 **Otros**
-- Centro de notificaciones con tipos (favoritos, comentarios, ofertas, pedidos, mensajes,
-  valoraciones, novedades, seguidores) y preferencias por tipo.
-- Guía de uso, centro de ayuda, denuncia de contenidos y textos legales
-  (términos, privacidad, cookies y artículos prohibidos).
-- Diseño adaptable con barra de navegación inferior en móvil, `sitemap.xml`, `robots.txt`
-  y manifiesto PWA.
+- Centro de notificaciones por tipo (favoritos, comentarios, ofertas, pedidos, mensajes,
+  calificaciones, novedades, seguidores y Mercado Shops) con preferencias.
+- Guía, centro de ayuda, denuncias, avisos legales, diseño adaptable con barra inferior en
+  móvil, `sitemap.xml`, `robots.txt` y manifiesto PWA.
 
 ## Arquitectura
 
@@ -82,31 +103,37 @@ npm run test:e2e   # prueba end-to-end del recorrido completo (requiere npm run 
 | --- | --- |
 | Framework | Next.js 16 (App Router, React 19, Server Components y Server Actions) |
 | Estilos | Tailwind CSS v4 con tokens de la paleta LINE |
-| Datos | SQLite mediante el módulo nativo `node:sqlite` (sin dependencias binarias) |
+| Datos | SQLite con el módulo nativo `node:sqlite` (sin dependencias binarias) y migración de columnas |
 | Sesiones | Cookie `httpOnly` + tabla `sessions`; contraseñas con `scrypt` |
 | Imágenes | Subida a `public/uploads` y generador SVG en `/api/photo` |
 
 ```
 src/
   app/            rutas (portada, búsqueda, categoría, artículo, venta, compra,
-                  transacción, mi cuenta, perfil, avisos, guía, ayuda, legal…)
-  components/     cabecera, tarjetas, galería, formularios y filtros
+                  transacción, mi cuenta, tiendas, perfil, avisos, guía, ayuda, legal…)
+  components/     cabecera, tarjetas, galería, formularios, filtros y panel de compra
   lib/            db.ts, auth.ts, queries.ts, actions.ts, constants.ts, format.ts
-  db/schema.sql   esquema de 20 tablas
-scripts/          seed.ts (datos de ejemplo) y e2e.mjs (prueba end-to-end)
+  db/schema.sql   esquema de 23 tablas (incluye shops, item_variants y shop_follows)
+scripts/          seed.ts (datos de ejemplo) y e2e.mjs (prueba end-to-end, 18 pasos)
 ```
 
 ## 日本語での概要
 
-メルカリと同等の機能をひととおり備えたクローンサイトです。配色は LINE グリーン
-（`#06C755`）、UI テキストはすべてスペイン語。出品・検索・いいね・コメント・値下げ
-交渉・購入・取引メッセージ・発送通知・受取評価・相互評価・売上金・ポイント・クーポン・
-本人確認・通知設定などを実装しています。
+メルカリと同等の機能をひととおり備えたクローンサイトの**メキシコ版**です。配色は LINE
+グリーン（`#06C755`）、UI テキストはすべてメキシコのスペイン語、通貨は MXN（ペソ）。
+出品・検索・いいね・コメント・値下げ交渉・購入・取引メッセージ・発送通知・受取評価・
+相互評価・売上金・ポイント・クーポン・本人確認・通知設定に加えて、**メルカリShops 相当の
+「Mercado Shops」**（在庫・バリエーション管理、複数個購入、ショップ運営ダッシュボード、
+特定商取引法にあたる「Información del vendedor」表示）を実装しています。
+
+メキシコ向けのローカライズとして、32州・5桁郵便番号・10桁電話番号、MSI（分割手数料無料）、
+OXXO等の店頭現金払い、SPEI送金、CLABEへの振込、連邦消費者保護法・LFPDPPP（ARCO権）に
+沿った法務ページを備えています。
 
 ```bash
 npm install && npm run seed && npm run dev   # http://localhost:3000
 ```
 
-デモアカウント: `demo@mercado.es` / `demo1234`
+デモアカウント: `demo@mercado.mx` / `demo1234`
 
 > 本サイトはデモです。決済や配送は実際には行われません。

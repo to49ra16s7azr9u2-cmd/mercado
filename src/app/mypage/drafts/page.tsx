@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { draftsOf } from "@/lib/queries";
 import { deleteItemAction } from "@/lib/actions";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -8,7 +8,7 @@ import { timeAgo } from "@/lib/format";
 export const metadata = { title: "Borradores" };
 
 export default async function DraftsPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/drafts");
   const drafts = draftsOf(user.id);
 
   return (

@@ -19,7 +19,15 @@ const errors = [];
 
 async function step(name, fn) {
   try { await fn(); log("OK   ", name); }
-  catch (e) { errors.push(`${name}: ${e.message}`); log("FALLO", name, "→", e.message.split("\n")[0]); }
+  catch (e) {
+    errors.push(`${name}: ${e.message}`);
+    log("FALLO", name, "→", e.message.split("\n")[0]);
+    if (process.env.SHOT_DIR) {
+      try {
+        await page.screenshot({ path: `${process.env.SHOT_DIR}/fallo-${name.replace(/\W+/g, "-")}.png` });
+      } catch {}
+    }
+  }
 }
 
 await step("home carga", async () => {
@@ -29,14 +37,14 @@ await step("home carga", async () => {
 
 await step("login demo", async () => {
   await page.goto(`${BASE}/login`);
-  await page.fill("#email", "demo@mercado.es");
+  await page.fill("#email", "demo@mercado.mx");
   await page.fill("#password", "demo1234");
   await page.click('button[type="submit"]');
   await page.waitForURL(BASE + "/", { timeout: 15000 });
 });
 
 await step("búsqueda con filtros", async () => {
-  await page.goto(`${BASE}/search?q=camiseta&priceMax=30&sort=price_asc`);
+  await page.goto(`${BASE}/search?q=playera&priceMax=800&sort=price_asc`);
   await page.waitForSelector("a[href^='/item/']", { timeout: 10000 });
 });
 
@@ -70,13 +78,13 @@ await step("publicar artículo nuevo", async () => {
   await page.fill("#description", "Artículo creado por la prueba end-to-end.");
   await page.selectOption("#cat1", { label: "Mujer" });
   await page.selectOption("#cat2", { index: 1 });
-  await page.fill('input[name="price"]', "25");
-  await page.selectOption("#ship_from", { label: "Madrid" });
+  await page.fill('input[name="price"]', "450");
+  await page.selectOption("#ship_from", { label: "Jalisco" });
   await page.getByRole("button", { name: "Publicar artículo" }).click();
   await page.waitForURL(/\/item\/.*published=1/, { timeout: 20000 });
   const text = await page.innerText("body");
   if (!text.includes("Camiseta de prueba automática")) throw new Error("no se ve el título publicado");
-  if (!text.includes("25")) throw new Error("no se ve el precio");
+  if (!text.includes("450")) throw new Error("no se ve el precio");
 });
 
 await step("comprar un artículo (checkout completo)", async () => {
@@ -88,6 +96,7 @@ await step("comprar un artículo (checkout completo)", async () => {
     if (await buy.count()) { await buy.click(); break; }
   }
   await page.waitForURL(/\/checkout\//, { timeout: 15000 });
+  await page.getByText("Resumen del pedido").waitFor({ timeout: 20000 });
   await page.getByRole("button", { name: /Confirmar la compra/ }).click();
   await page.waitForURL(/\/transaction\/.*new=1/, { timeout: 20000 });
 });
@@ -104,7 +113,9 @@ await step("enviar mensaje en la transacción", async () => {
 
 await step("aparece en Mis compras", async () => {
   await page.goto(`${BASE}/mypage/purchases`);
-  if (!(await page.innerText("body")).includes("Pago confirmado")) throw new Error("no figura la compra");
+  await page.getByText(/Pago confirmado|Enviado/).first().waitFor({ timeout: 20000 });
+  const purchases = await page.innerText("body");
+  if (!/Pago confirmado|Enviado/.test(purchases)) throw new Error("no figura la compra");
 });
 
 // El vendedor envía → el comprador valora → el vendedor valora
@@ -133,12 +144,107 @@ await step("flujo completo vendedor/comprador", async () => {
 
   await sp.goto(txUrl);
   await sp.locator('label:has(input[name="score"][value="good"])').click();
-  await sp.getByRole("button", { name: /Enviar valoración/ }).click();
+  await sp.getByRole("button", { name: /Enviar calificación/ }).click();
   await sp.waitForTimeout(1800);
+  await sp.getByText(/Calificaciones/).first().waitFor({ timeout: 20000 });
   const body = await sp.innerText("body");
-  if (!body.includes("Finalizada") && !body.includes("Valoraciones"))
-    throw new Error("la transacción no se ha cerrado");
+  if (!/finalizada/i.test(body)) throw new Error("la transacción no se cerró");
   await sellerCtx.close();
+});
+
+/* ----------------------------- Mercado Shops ----------------------------- */
+
+const shopCtx = await browser.newContext();
+const sp2 = await shopCtx.newPage();
+const shopEmail = `tienda${Date.now()}@mercado.mx`;
+let shopItemUrl;
+
+await step("registro de una cuenta nueva", async () => {
+  await sp2.goto(`${BASE}/signup`);
+  await sp2.fill("#name", "Tienda de Prueba");
+  await sp2.fill("#email", shopEmail);
+  await sp2.fill("#password", "tienda1234");
+  await sp2.locator('input[type="checkbox"]').check();
+  await sp2.getByRole("button", { name: /Crear cuenta/ }).click();
+  await sp2.waitForURL(BASE + "/", { timeout: 20000 });
+});
+
+await step("abrir tienda en Mercado Shops", async () => {
+  await sp2.goto(`${BASE}/mypage/shop/new`);
+  await sp2.fill("#name", "Tienda Automática MX");
+  await sp2.selectOption("#category", { label: "Moda y accesorios" });
+  await sp2.fill("#description", "Tienda creada por la prueba end-to-end.");
+  await sp2.selectOption("#ship_from", { label: "Jalisco" });
+  await sp2.fill("#legal_name", "Tienda Automática S.A. de C.V.");
+  await sp2.fill("#rfc", "TAU200101AB1");
+  await sp2.fill("#legal_address", "Av. Vallarta 1200, Col. Americana, Guadalajara, Jalisco, C.P. 44160");
+  await sp2.fill("#legal_phone", "3312345678");
+  await sp2.fill("#legal_email", "contacto@tienda-automatica.mx");
+  await sp2.getByRole("button", { name: /Enviar solicitud/ }).click();
+  await sp2.waitForURL(/\/mypage\/shop$/, { timeout: 20000 });
+  if (!(await sp2.innerText("body")).includes("En revisión")) throw new Error("la tienda no quedó en revisión");
+});
+
+await step("aprobar la tienda y publicar producto con variantes", async () => {
+  await sp2.getByRole("button", { name: /Simular aprobación/ }).click();
+  await sp2.waitForTimeout(1500);
+  await sp2.goto(`${BASE}/mypage/shop/items/new`);
+  await sp2.fill("#title", "Playera de prueba automática");
+  await sp2.fill("#description", "Producto de tienda creado por la prueba end-to-end.");
+  await sp2.selectOption("#cat1", { label: "Mujer" });
+  await sp2.selectOption("#cat2", { index: 1 });
+  await sp2.locator('input[type="checkbox"]').first().check(); // usar variantes
+  await sp2.locator('input[name="variant_label"]').first().fill("Talla M · Negro");
+  await sp2.locator('input[name="variant_stock"]').first().fill("5");
+  await sp2.getByRole("button", { name: /Agregar variante/ }).click();
+  await sp2.locator('input[name="variant_label"]').nth(1).fill("Talla G · Blanco");
+  await sp2.locator('input[name="variant_stock"]').nth(1).fill("3");
+  await sp2.locator('input[name="price"]').fill("450");
+  await sp2.getByRole("button", { name: "Publicar producto" }).click();
+  await sp2.waitForURL(/\/item\/.*published=1/, { timeout: 20000 });
+  shopItemUrl = sp2.url().split("?")[0];
+  const body = await sp2.innerText("body");
+  if (!body.includes("Talla M")) throw new Error("no se ven las variantes en la ficha");
+  if (!body.includes("8 piezas")) throw new Error("el inventario total no es correcto");
+});
+
+await step("la tienda aparece en el directorio", async () => {
+  await page.goto(`${BASE}/shops`);
+  await page.getByText("Tienda Automática MX").first().waitFor({ timeout: 20000 });
+});
+
+await step("comprar 2 piezas de un producto de tienda", async () => {
+  await page.goto(shopItemUrl);
+  await page.selectOption("#qty", "2");
+  await page.getByRole("button", { name: "Comprar ahora" }).click();
+  await page.waitForURL(/\/checkout\//, { timeout: 15000 });
+  await page.getByText("Resumen del pedido").waitFor({ timeout: 20000 });
+  const summary = await page.innerText("body");
+  if (!summary.includes("Producto × 2")) throw new Error("el resumen no refleja la cantidad");
+  await page.getByRole("button", { name: /Confirmar la compra/ }).click();
+  await page.waitForURL(/\/transaction\/.*new=1/, { timeout: 20000 });
+});
+
+await step("el inventario baja y el pedido llega a la tienda", async () => {
+  await sp2.goto(`${BASE}/mypage/shop/items`);
+  await sp2.getByText(/pza en inventario/).first().waitFor({ timeout: 20000 });
+  const inventory = await sp2.innerText("body");
+  if (!inventory.includes("6 pza")) throw new Error(`inventario no descontado: ${inventory.match(/\d+ pza/)?.[0]}`);
+  await sp2.goto(`${BASE}/mypage/shop/orders`);
+  await sp2.getByText(/pza/).first().waitFor({ timeout: 20000 });
+  const orders = await sp2.innerText("body");
+  if (!orders.includes("2 pza")) throw new Error("el pedido no muestra la cantidad");
+  await sp2.locator('input[name="tracking"]').first().fill("MD5555555555MX");
+  await sp2.getByRole("button", { name: /Marcar como enviado/ }).first().click();
+  await sp2.getByText("Enviado").first().waitFor({ timeout: 20000 });
+});
+
+await step("páginas de Shops responden", async () => {
+  for (const path of ["/shops", "/mypage/shop", "/mypage/shop/items", "/mypage/shop/orders",
+    "/mypage/shop/settings", "/mypage/shops", "/legal/shops"]) {
+    const res = await sp2.goto(BASE + path);
+    if (res.status() !== 200) throw new Error(`${path} → ${res.status()}`);
+  }
 });
 
 await step("páginas de la cuenta responden", async () => {
@@ -149,6 +255,8 @@ await step("páginas de la cuenta responden", async () => {
     if (res.status() !== 200) throw new Error(`${path} → ${res.status()}`);
   }
 });
+
+await shopCtx.close();
 
 await page.goto(BASE);
 if (process.env.SHOT_DIR) await page.screenshot({ path: process.env.SHOT_DIR + "/home.png" });

@@ -1,6 +1,6 @@
 import "server-only";
 import { all, get } from "./db";
-import type { Category, Comment, Item, ItemCard, Notification, Order, User } from "./types";
+import type { Category, Comment, Item, ItemCard, Notification, Order, Shop, User, Variant } from "./types";
 
 /* ---------------------------------- categorías --------------------------------- */
 
@@ -66,8 +66,11 @@ const CARD_SELECT = `
   SELECT i.*,
     (SELECT url FROM item_images WHERE item_id = i.id ORDER BY position LIMIT 1) AS image,
     (SELECT COUNT(*) FROM likes WHERE item_id = i.id) AS likes,
-    u.name AS seller_name, u.handle AS seller_handle, u.avatar_seed AS seller_avatar
-  FROM items i JOIN users u ON u.id = i.seller_id
+    u.name AS seller_name, u.handle AS seller_handle, u.avatar_seed AS seller_avatar,
+    sh.name AS shop_name, sh.slug AS shop_slug, sh.logo_seed AS shop_logo, sh.status AS shop_status
+  FROM items i
+  JOIN users u ON u.id = i.seller_id
+  LEFT JOIN shops sh ON sh.id = i.shop_id
 `;
 
 export type SearchParams = {
@@ -81,6 +84,8 @@ export type SearchParams = {
   shippingPayer?: string;
   status?: string;
   sellerId?: string;
+  shopId?: string;
+  sellerKind?: string;
   sort?: string;
   page?: number;
   perPage?: number;
@@ -129,6 +134,14 @@ function buildWhere(p: SearchParams) {
     where.push("i.seller_id = ?");
     params.push(p.sellerId);
   }
+  if (p.shopId) {
+    where.push("i.shop_id = ?");
+    params.push(p.shopId);
+  }
+  if (p.sellerKind === "shop") where.push("i.shop_id IS NOT NULL");
+  if (p.sellerKind === "person") where.push("i.shop_id IS NULL");
+  // Los artículos de tiendas suspendidas o en revisión no aparecen en el catálogo.
+  where.push("(i.shop_id IS NULL OR i.shop_id IN (SELECT id FROM shops WHERE status = 'active'))");
   if (p.excludeId) {
     where.push("i.id != ?");
     params.push(p.excludeId);
@@ -203,6 +216,115 @@ export function itemOffers(itemId: string) {
     `SELECT o.*, u.name, u.handle, u.avatar_seed FROM offers o
      JOIN users u ON u.id = o.user_id WHERE o.item_id = ? ORDER BY o.created_at DESC`,
     [itemId],
+  );
+}
+
+/* ------------------------------ Mercado Shops ---------------------------- */
+
+export function shopById(id: string): Shop | undefined {
+  return get<Shop>("SELECT * FROM shops WHERE id = ?", [id]);
+}
+
+export function shopBySlug(slug: string): Shop | undefined {
+  return get<Shop>("SELECT * FROM shops WHERE slug = ?", [slug]);
+}
+
+export function shopOfUser(userId: string): Shop | undefined {
+  return get<Shop>("SELECT * FROM shops WHERE owner_id = ? ORDER BY created_at LIMIT 1", [userId]);
+}
+
+export function activeShops(q?: string, category?: string): (Shop & { items: number; followers: number })[] {
+  const where = ["status = 'active'"];
+  const params: Array<string | number> = [];
+  if (q) {
+    where.push("(name LIKE ? OR description LIKE ?)");
+    params.push(`%${q}%`, `%${q}%`);
+  }
+  if (category) {
+    where.push("category = ?");
+    params.push(category);
+  }
+  return all<Shop & { items: number; followers: number }>(
+    `SELECT s.*,
+       (SELECT COUNT(*) FROM items WHERE shop_id = s.id AND status = 'on_sale') AS items,
+       (SELECT COUNT(*) FROM shop_follows WHERE shop_id = s.id) AS followers
+     FROM shops s WHERE ${where.join(" AND ")} ORDER BY items DESC, s.created_at DESC`,
+    params,
+  );
+}
+
+export function shopItems(shopId: string, statuses = ["on_sale"]): ItemCard[] {
+  return all<ItemCard>(
+    `${CARD_SELECT} WHERE i.shop_id = ? AND i.status IN (${statuses.map(() => "?").join(",")})
+     ORDER BY i.updated_at DESC`,
+    [shopId, ...statuses],
+  );
+}
+
+export function shopStats(shopId: string) {
+  const items = get<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM items WHERE shop_id = ? AND status = 'on_sale'", [shopId])?.n ?? 0;
+  const sold = get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE shop_id = ?", [shopId])?.n ?? 0;
+  const revenue = get<{ n: number }>(
+    "SELECT COALESCE(SUM(payout), 0) AS n FROM orders WHERE shop_id = ? AND status = 'done'", [shopId])?.n ?? 0;
+  const pending = get<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM orders WHERE shop_id = ? AND status = 'paid'", [shopId])?.n ?? 0;
+  const followers = get<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM shop_follows WHERE shop_id = ?", [shopId])?.n ?? 0;
+  const stock = get<{ n: number }>(
+    "SELECT COALESCE(SUM(stock), 0) AS n FROM items WHERE shop_id = ? AND status = 'on_sale'", [shopId])?.n ?? 0;
+  return { items, sold, revenue, pending, followers, stock };
+}
+
+export function shopOrders(shopId: string): OrderRow[] {
+  return all<OrderRow>(`${ORDER_SELECT} WHERE o.shop_id = ? ORDER BY o.created_at DESC`, [shopId]);
+}
+
+export function shopRating(shopId: string) {
+  const rows = all<{ score: string; n: number }>(
+    `SELECT r.score, COUNT(*) AS n FROM reviews r
+     JOIN orders o ON o.id = r.order_id
+     WHERE o.shop_id = ? AND r.ratee_id = o.seller_id GROUP BY r.score`,
+    [shopId],
+  );
+  const map: Record<string, number> = { good: 0, normal: 0, bad: 0 };
+  for (const row of rows) map[row.score] = row.n;
+  return {
+    good: map.good, normal: map.normal, bad: map.bad,
+    total: map.good + map.normal + map.bad,
+  };
+}
+
+export function isFollowingShop(userId: string, shopId: string): boolean {
+  return !!get("SELECT 1 AS x FROM shop_follows WHERE user_id = ? AND shop_id = ?", [userId, shopId]);
+}
+
+export function followedShops(userId: string): Shop[] {
+  return all<Shop>(
+    `SELECT s.* FROM shop_follows f JOIN shops s ON s.id = f.shop_id
+     WHERE f.user_id = ? AND s.status = 'active' ORDER BY f.created_at DESC`,
+    [userId],
+  );
+}
+
+export function variantsOf(itemId: string): Variant[] {
+  return all<Variant>("SELECT * FROM item_variants WHERE item_id = ? ORDER BY position, id", [itemId]);
+}
+
+export function itemsFromFollowedShops(userId: string, limit = 12): ItemCard[] {
+  return all<ItemCard>(
+    `${CARD_SELECT} JOIN shop_follows f ON f.shop_id = i.shop_id
+     WHERE f.user_id = ? AND i.status = 'on_sale' AND sh.status = 'active'
+     ORDER BY i.created_at DESC LIMIT ?`,
+    [userId, limit],
+  );
+}
+
+export function shopItemsForHome(limit = 12): ItemCard[] {
+  return all<ItemCard>(
+    `${CARD_SELECT} WHERE i.status = 'on_sale' AND i.shop_id IS NOT NULL AND sh.status = 'active'
+     ORDER BY i.created_at DESC LIMIT ?`,
+    [limit],
   );
 }
 

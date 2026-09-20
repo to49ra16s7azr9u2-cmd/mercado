@@ -1,7 +1,8 @@
 import "server-only";
 import { get, newId, nowIso, run } from "./db";
 
-type Kind = "like" | "comment" | "offer" | "order" | "message" | "review" | "news" | "follow";
+type Kind =
+  | "like" | "comment" | "offer" | "order" | "message" | "review" | "news" | "follow" | "shop";
 
 const FLAG: Record<Kind, string | null> = {
   like: "notify_like",
@@ -12,6 +13,7 @@ const FLAG: Record<Kind, string | null> = {
   review: "notify_order",
   news: "notify_news",
   follow: null,
+  shop: "notify_news",
 };
 
 export function notify(opts: {

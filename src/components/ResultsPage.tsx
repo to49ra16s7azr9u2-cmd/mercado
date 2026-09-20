@@ -25,6 +25,7 @@ export function parseSearchParams(sp: Record<string, string | string[] | undefin
     cond: many("cond"),
     shipping: one("shipping"),
     status: one("status") || "all",
+    seller: one("seller") || "all",
     sort: one("sort") || "new",
     page: Math.max(1, Number(one("page")) || 1),
   };
@@ -52,6 +53,7 @@ export function ResultsPage({
     conditions: params.cond.map(Number).filter(Boolean),
     shippingPayer: params.shipping || undefined,
     status: params.status,
+    sellerKind: params.seller === "all" ? undefined : params.seller,
     sort: params.sort,
     page: params.page,
     perPage: PER_PAGE,

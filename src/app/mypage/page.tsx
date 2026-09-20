@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import {
   couponsOf, draftsOf, likedItems, listingsOf, openOrdersOf, purchasesOf, salesOf, unreadCount,
 } from "@/lib/queries";
@@ -17,7 +17,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function MyPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage");
   const open = openOrdersOf(user.id);
   const listings = listingsOf(user.id, ["on_sale", "stopped"]);
   const drafts = draftsOf(user.id);

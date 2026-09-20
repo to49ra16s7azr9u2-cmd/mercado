@@ -1,4 +1,4 @@
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { cardsOf } from "@/lib/queries";
 import { addCardAction, deleteCardAction, setDefaultCardAction } from "@/lib/actions";
 import { CardForm } from "@/components/SettingsForms";
@@ -8,7 +8,7 @@ import { PAYMENT_METHODS } from "@/lib/constants";
 export const metadata = { title: "Métodos de pago" };
 
 export default async function PaymentPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/payment");
   const cards = cardsOf(user.id);
 
   return (

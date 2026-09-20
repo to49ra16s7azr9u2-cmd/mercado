@@ -1,14 +1,14 @@
 export function money(value: number): string {
-  return new Intl.NumberFormat("es-ES", {
+  return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "EUR",
+    currency: "MXN",
     minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
     maximumFractionDigits: 2,
   }).format(value);
 }
 
 export function plain(value: number): string {
-  return new Intl.NumberFormat("es-ES").format(value);
+  return new Intl.NumberFormat("es-MX").format(value);
 }
 
 export function timeAgo(iso: string): string {
@@ -28,7 +28,7 @@ export function timeAgo(iso: string): string {
 }
 
 export function longDate(iso: string): string {
-  return new Intl.DateTimeFormat("es-ES", {
+  return new Intl.DateTimeFormat("es-MX", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -38,7 +38,7 @@ export function longDate(iso: string): string {
 }
 
 export function shortDate(iso: string): string {
-  return new Intl.DateTimeFormat("es-ES", {
+  return new Intl.DateTimeFormat("es-MX", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

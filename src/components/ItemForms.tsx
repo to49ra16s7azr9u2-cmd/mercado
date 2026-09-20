@@ -61,12 +61,12 @@ export function OfferForm({
           <label key={s} className="flex-1">
             <input type="radio" name="price" value={s} className="peer sr-only" />
             <span className="block cursor-pointer rounded-lg border border-line py-2 text-center text-sm font-bold peer-checked:border-brand peer-checked:bg-brand-soft peer-checked:text-brand-darker">
-              {s} €
+              ${s}
             </span>
           </label>
         ))}
       </div>
-      <input name="price" type="number" min={1} max={price - 1} placeholder="Otro importe (€)" className="input" />
+      <input name="price" type="number" min={1} max={price - 1} placeholder="Otro monto ($)" className="input" />
       {state.error && <p className="text-xs text-red-600">{state.error}</p>}
       {state.ok && <p className="text-xs text-brand-darker">{state.ok}</p>}
       <div className="flex gap-2">

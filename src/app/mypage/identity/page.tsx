@@ -1,11 +1,11 @@
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { verifyIdentityAction } from "@/lib/actions";
 import { SubmitButton } from "@/components/SubmitButton";
 
 export const metadata = { title: "Verificación de identidad" };
 
 export default async function IdentityPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/identity");
   return (
     <>
       <h1 className="text-xl font-bold">Verificación de identidad</h1>

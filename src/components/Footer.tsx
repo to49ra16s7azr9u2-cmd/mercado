@@ -11,6 +11,8 @@ const COLUMNS = [
       { href: "/guide#envios", label: "Métodos de envío" },
       { href: "/guide#comisiones", label: "Comisiones y pagos" },
       { href: "/brands", label: "Marcas" },
+      { href: "/shops", label: "Mercado Shops" },
+      { href: "/mypage/shop/new", label: "Vender como negocio" },
     ],
   },
   {
@@ -29,6 +31,7 @@ const COLUMNS = [
       { href: "/legal/privacidad", label: "Política de privacidad" },
       { href: "/legal/cookies", label: "Política de cookies" },
       { href: "/legal/prohibidos", label: "Artículos prohibidos" },
+      { href: "/legal/shops", label: "Reglas de Mercado Shops" },
     ],
   },
 ];
@@ -40,8 +43,8 @@ export function Footer() {
         <div>
           <p className="text-xl font-black text-brand">{SITE_NAME}</p>
           <p className="mt-2 text-xs leading-relaxed text-muted">
-            El mercado donde todo encuentra una segunda vida. Compra y vende con envíos
-            protegidos y pago garantizado.
+            El mercado donde todo encuentra una segunda vida. Compra y vende en todo México con
+            envíos rastreados y pago protegido.
           </p>
           <div className="mt-3 flex gap-2 text-lg" aria-hidden>
             <span>🤳</span><span>📷</span><span>🐦</span><span>▶️</span>

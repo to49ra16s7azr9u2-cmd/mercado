@@ -18,7 +18,28 @@ function open(): DatabaseSync {
     "utf8",
   );
   db.exec(schema);
+  migrate(db);
   return db;
+}
+
+/**
+ * Agrega columnas nuevas a bases de datos creadas con versiones anteriores del
+ * esquema (SQLite no vuelve a aplicar CREATE TABLE IF NOT EXISTS).
+ */
+function migrate(db: DatabaseSync) {
+  const additions: [string, string, string][] = [
+    ["items", "shop_id", "TEXT"],
+    ["items", "stock", "INTEGER NOT NULL DEFAULT 1"],
+    ["orders", "quantity", "INTEGER NOT NULL DEFAULT 1"],
+    ["orders", "shop_id", "TEXT"],
+    ["orders", "variant_label", "TEXT NOT NULL DEFAULT ''"],
+  ];
+  for (const [table, column, definition] of additions) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!columns.some((c) => c.name === column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+  }
 }
 
 export function getDb(): DatabaseSync {

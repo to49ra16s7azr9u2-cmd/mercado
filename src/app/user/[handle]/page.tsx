@@ -82,14 +82,14 @@ export default async function UserPage({
           Vendidos ({sold.length})
         </Link>
         <Link href={`/user/${handle}?tab=reviews`} className={`chip ${active === "reviews" ? "chip-active" : ""}`}>
-          Valoraciones ({rating.total})
+          Calificaciones ({rating.total})
         </Link>
       </div>
 
       <div className="mt-4">
         {active === "reviews" ? (
           reviews.length === 0 ? (
-            <p className="card p-8 text-center text-sm text-muted">Todavía no tiene valoraciones.</p>
+            <p className="card p-8 text-center text-sm text-muted">Todavía no tiene calificaciones.</p>
           ) : (
             <ul className="card divide-y divide-line">
               {reviews.map((review) => (

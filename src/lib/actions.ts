@@ -6,8 +6,10 @@ import { all, get, newId, nowIso, run, tx } from "./db";
 import { createSession, currentUser, destroySession, hashPassword, verifyPassword } from "./auth";
 import { ledgerEntry, notify } from "./notify";
 import { saveImage } from "./upload";
-import { FEE_RATE, MAX_PRICE, MIN_PAYOUT, MIN_PRICE, PAYOUT_FEE, shippingCostOf } from "./constants";
-import type { Item, User } from "./types";
+import {
+  CASH_FEE, FEE_RATE, MAX_PRICE, MIN_PAYOUT, MIN_PRICE, MSI_MIN, PAYOUT_FEE, shippingCostOf,
+} from "./constants";
+import type { Item, Shop, User } from "./types";
 
 export type ActionState = { error?: string; ok?: string };
 
@@ -43,7 +45,7 @@ export async function signUpAction(_prev: ActionState, form: FormData): Promise<
   run(
     `INSERT INTO coupons (id, user_id, title, code, amount, min_price, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [newId("c_"), id, "Cupón de bienvenida: 5 € de descuento", "BIENVENIDA5", 5, 20,
+    [newId("c_"), id, "Cupón de bienvenida: $100 de descuento", "BIENVENIDA100", 100, 400,
       new Date(Date.now() + 30 * 864e5).toISOString()],
   );
   await createSession(id);
@@ -111,7 +113,7 @@ export async function saveItemAction(_prev: ActionState, form: FormData): Promis
     if (title.length < 3) return { error: "El título debe tener al menos 3 caracteres." };
     if (!categoryId) return { error: "Selecciona una categoría." };
     if (price < MIN_PRICE || price > MAX_PRICE)
-      return { error: `El precio debe estar entre ${MIN_PRICE} € y ${MAX_PRICE} €.` };
+      return { error: `El precio debe estar entre $${MIN_PRICE} y $${MAX_PRICE}.` };
   }
 
   const values = {
@@ -209,7 +211,7 @@ export async function updatePriceAction(formData: FormData) {
     const likers = all<{ user_id: string }>("SELECT user_id FROM likes WHERE item_id = ?", [id]);
     const image = get<{ url: string }>("SELECT url FROM item_images WHERE item_id = ? ORDER BY position LIMIT 1", [id])?.url ?? "";
     for (const l of likers) {
-      notify({ userId: l.user_id, kind: "like", title: "¡Ha bajado de precio!", body: `${item.title} ahora cuesta ${price} €`, link: `/item/${id}`, image });
+      notify({ userId: l.user_id, kind: "like", title: "¡Ha bajado de precio!", body: `${item.title} ahora cuesta $${price}`, link: `/item/${id}`, image });
     }
   }
   revalidatePath(`/item/${id}`);
@@ -301,13 +303,13 @@ export async function makeOfferAction(_prev: ActionState, form: FormData): Promi
   if (!item || item.status !== "on_sale") return { error: "El artículo ya no está a la venta." };
   if (item.seller_id === user.id) return { error: "No puedes hacer una oferta por tu propio artículo." };
   if (!item.offers_enabled) return { error: "Quien vende no acepta ofertas en este artículo." };
-  if (!Number.isFinite(price) || price < MIN_PRICE) return { error: "Introduce un importe válido." };
+  if (!Number.isFinite(price) || price < MIN_PRICE) return { error: "Introduce un monto válido." };
   if (price >= item.price) return { error: "La oferta debe ser inferior al precio publicado." };
   if (price < Math.round(item.price * 0.5)) return { error: "La oferta no puede ser inferior al 50 % del precio." };
   run("INSERT INTO offers (id, item_id, user_id, price, status, created_at) VALUES (?,?,?,?,'pending',?)",
     [newId("of_"), itemId, user.id, price, nowIso()]);
   const image = get<{ url: string }>("SELECT url FROM item_images WHERE item_id = ? ORDER BY position LIMIT 1", [itemId])?.url ?? "";
-  notify({ userId: item.seller_id, kind: "offer", title: `${user.name} te ha hecho una oferta de ${price} €`, body: item.title, link: `/item/${itemId}`, image });
+  notify({ userId: item.seller_id, kind: "offer", title: `${user.name} te hizo una oferta de $${price}`, body: item.title, link: `/item/${itemId}`, image });
   revalidatePath(`/item/${itemId}`);
   return { ok: "Oferta enviada. Quien vende decidirá si la acepta." };
 }
@@ -327,7 +329,7 @@ export async function respondOfferAction(formData: FormData) {
     run("UPDATE offers SET status = 'accepted' WHERE id = ?", [id]);
     run("UPDATE offers SET status = 'rejected' WHERE item_id = ? AND id != ? AND status = 'pending'", [item.id, id]);
     run("UPDATE items SET price = ?, updated_at = ? WHERE id = ?", [offer.price, nowIso(), item.id]);
-    notify({ userId: offer.user_id, kind: "offer", title: "¡Han aceptado tu oferta!", body: `${item.title} por ${offer.price} €. Complétala antes de que otra persona la compre.`, link: `/item/${item.id}`, image });
+    notify({ userId: offer.user_id, kind: "offer", title: "¡Han aceptado tu oferta!", body: `${item.title} por $${offer.price}. Complétala antes de que alguien más lo compre.`, link: `/item/${item.id}`, image });
   } else {
     run("UPDATE offers SET status = 'rejected' WHERE id = ?", [id]);
     notify({ userId: offer.user_id, kind: "offer", title: "Tu oferta no ha sido aceptada", body: item.title, link: `/item/${item.id}`, image });
@@ -366,6 +368,26 @@ export async function purchaseAction(_prev: ActionState, form: FormData): Promis
   if (item.status !== "on_sale") return { error: "Este artículo ya no está disponible." };
   if (item.seller_id === user.id) return { error: "No puedes comprar tu propio artículo." };
 
+  const shop = item.shop_id ? get<Shop>("SELECT * FROM shops WHERE id = ?", [item.shop_id]) : undefined;
+  if (item.shop_id && shop?.status !== "active")
+    return { error: "La tienda no está disponible en este momento." };
+
+  // Variante y cantidad (solo aplican a los artículos de Mercado Shops)
+  const variantId = Number(form.get("variant_id")) || 0;
+  const variants = all<{ id: number; label: string; stock: number }>(
+    "SELECT id, label, stock FROM item_variants WHERE item_id = ?", [itemId]);
+  let variant: { id: number; label: string; stock: number } | undefined;
+  if (variants.length) {
+    variant = variants.find((v) => v.id === variantId);
+    if (!variant) return { error: "Elige una variante disponible." };
+    if (variant.stock <= 0) return { error: "Esa variante está agotada." };
+  }
+
+  const maxStock = variant ? variant.stock : item.shop_id ? item.stock : 1;
+  const quantity = item.shop_id ? Math.max(1, Math.round(Number(form.get("quantity")) || 1)) : 1;
+  if (quantity > maxStock)
+    return { error: `Solo quedan ${maxStock} piezas disponibles.` };
+
   const fresh = get<User>("SELECT * FROM users WHERE id = ?", [user.id])!;
   const shipName = String(form.get("ship_name") ?? fresh.addr_name).trim();
   const shipZip = String(form.get("ship_zip") ?? fresh.addr_zip).trim();
@@ -378,6 +400,8 @@ export async function purchaseAction(_prev: ActionState, form: FormData): Promis
 
   const paymentMethod = String(form.get("payment_method") ?? "card");
   const shippingCost = item.shipping_payer === "buyer" ? shippingCostOf(item.shipping_method) : 0;
+  const cashFee = paymentMethod === "cash" ? CASH_FEE : 0;
+  const subtotal = item.price * quantity;
   const pointsRequested = Math.max(0, Math.round(Number(form.get("points_used")) || 0));
   const couponId = String(form.get("coupon_id") ?? "");
 
@@ -387,35 +411,56 @@ export async function purchaseAction(_prev: ActionState, form: FormData): Promis
     coupon = get("SELECT id, amount, min_price FROM coupons WHERE id = ? AND user_id = ? AND used_at IS NULL AND expires_at > ?",
       [couponId, user.id, nowIso()]);
     if (!coupon) return { error: "El cupón seleccionado ya no es válido." };
-    if (item.price < coupon.min_price) return { error: "El cupón no se puede aplicar a este importe." };
+    if (subtotal < coupon.min_price) return { error: "El cupón no aplica para este monto." };
     couponAmount = coupon.amount;
   }
 
-  const gross = item.price + shippingCost;
+  const gross = subtotal + shippingCost + cashFee;
   const pointsUsed = Math.min(pointsRequested, fresh.points, Math.max(0, gross - couponAmount));
   const charged = Math.max(0, gross - couponAmount - pointsUsed);
 
   if (paymentMethod === "balance" && fresh.balance < charged)
     return { error: "No tienes saldo suficiente para completar la compra." };
-  if (paymentMethod === "card" && !get("SELECT 1 AS x FROM cards WHERE user_id = ?", [user.id]))
-    return { error: "Añade primero una tarjeta en «Métodos de pago»." };
+  if ((paymentMethod === "card" || paymentMethod === "msi") &&
+      !get("SELECT 1 AS x FROM cards WHERE user_id = ?", [user.id]))
+    return { error: "Primero agrega una tarjeta en «Métodos de pago»." };
+  if (paymentMethod === "msi" && charged < MSI_MIN)
+    return { error: `Los meses sin intereses aplican en compras desde $${MSI_MIN}.` };
 
-  const fee = Math.round(item.price * FEE_RATE);
+  const fee = Math.round(subtotal * FEE_RATE);
   const sellerShipping = item.shipping_payer === "seller" ? shippingCostOf(item.shipping_method) : 0;
-  const payout = Math.max(0, item.price - fee - sellerShipping);
+  const payout = Math.max(0, subtotal - fee - sellerShipping);
   const orderId = newId("o_");
+  const remaining = maxStock - quantity;
 
   tx(() => {
     run(
-      `INSERT INTO orders (id, item_id, buyer_id, seller_id, price, points_used, coupon_id, coupon_amount,
-        charged, fee, shipping_cost, payout, payment_method, status, ship_name, ship_zip, ship_region,
-        ship_city, ship_line, ship_phone, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'paid',?,?,?,?,?,?,?)`,
-      [orderId, item.id, user.id, item.seller_id, item.price, pointsUsed, coupon?.id ?? null, couponAmount,
-       charged, fee, shippingCost, payout, paymentMethod, shipName, shipZip, shipRegion, shipCity,
+      `INSERT INTO orders (id, item_id, buyer_id, seller_id, price, quantity, shop_id, variant_label,
+        points_used, coupon_id, coupon_amount, charged, fee, shipping_cost, payout, payment_method,
+        status, ship_name, ship_zip, ship_region, ship_city, ship_line, ship_phone, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'paid',?,?,?,?,?,?,?)`,
+      [orderId, item.id, user.id, item.seller_id, item.price, quantity, item.shop_id ?? null,
+       variant?.label ?? "", pointsUsed, coupon?.id ?? null, couponAmount, charged, fee,
+       shippingCost + cashFee, payout, paymentMethod, shipName, shipZip, shipRegion, shipCity,
        shipLine, shipPhone, nowIso()],
     );
-    run("UPDATE items SET status = 'trading', updated_at = ? WHERE id = ?", [nowIso(), item.id]);
+
+    if (variant) {
+      run("UPDATE item_variants SET stock = stock - ? WHERE id = ?", [quantity, variant.id]);
+    }
+    if (item.shop_id) {
+      run("UPDATE items SET stock = MAX(stock - ?, 0), updated_at = ? WHERE id = ?",
+        [quantity, nowIso(), item.id]);
+      const stockLeft = variants.length
+        ? (get<{ n: number }>("SELECT COALESCE(SUM(stock), 0) AS n FROM item_variants WHERE item_id = ?", [item.id])?.n ?? 0)
+        : remaining;
+      if (stockLeft <= 0) {
+        run("UPDATE items SET status = 'trading', stock = 0, updated_at = ? WHERE id = ?", [nowIso(), item.id]);
+      }
+    } else {
+      run("UPDATE items SET status = 'trading', updated_at = ? WHERE id = ?", [nowIso(), item.id]);
+    }
+
     if (pointsUsed > 0) {
       run("UPDATE users SET points = points - ? WHERE id = ?", [pointsUsed, user.id]);
       ledgerEntry(user.id, "points", -pointsUsed, `Puntos usados en «${item.title}»`);
@@ -429,10 +474,17 @@ export async function purchaseAction(_prev: ActionState, form: FormData): Promis
   });
 
   const image = get<{ url: string }>("SELECT url FROM item_images WHERE item_id = ? ORDER BY position LIMIT 1", [item.id])?.url ?? "";
-  notify({ userId: item.seller_id, kind: "order", title: "¡Has vendido un artículo!", body: `${item.title} · Prepara el envío`, link: `/transaction/${orderId}`, image });
-  notify({ userId: user.id, kind: "order", title: "Compra confirmada", body: `${item.title} · Ya puedes hablar con quien vende`, link: `/transaction/${orderId}`, image });
+  notify({
+    userId: item.seller_id,
+    kind: "order",
+    title: shop ? "¡Nueva venta en tu tienda!" : "¡Vendiste un artículo!",
+    body: `${item.title}${quantity > 1 ? ` × ${quantity}` : ""} · Prepara el envío`,
+    link: `/transaction/${orderId}`,
+    image,
+  });
+  notify({ userId: user.id, kind: "order", title: "Compra confirmada", body: `${item.title} · Ya puedes escribirle a quien vende`, link: `/transaction/${orderId}`, image });
   run("INSERT INTO messages (id, order_id, user_id, body, created_at) VALUES (?,?,?,?,?)",
-    [newId("ms_"), orderId, user.id, "¡Hola! Acabo de comprar el artículo. Gracias de antemano.", nowIso()]);
+    [newId("ms_"), orderId, user.id, "¡Hola! Acabo de realizar la compra. Quedo al pendiente del envío.", nowIso()]);
 
   revalidatePath("/");
   redirect(`/transaction/${orderId}?new=1`);
@@ -444,6 +496,7 @@ function loadOrder(id: string) {
   return get<{
     id: string; item_id: string; buyer_id: string; seller_id: string; status: string;
     payout: number; price: number; points_used: number; charged: number; payment_method: string;
+    quantity: number; shop_id: string | null; variant_label: string;
   }>("SELECT * FROM orders WHERE id = ?", [id]);
 }
 
@@ -467,15 +520,15 @@ export async function confirmReceiptAction(_prev: ActionState, form: FormData): 
   if (!user) redirect("/login");
   const id = String(form.get("order_id") ?? "");
   const order = loadOrder(id);
-  if (!order || order.buyer_id !== user.id) return { error: "No puedes valorar esta transacción." };
+  if (!order || order.buyer_id !== user.id) return { error: "No puedes calificar esta transacción." };
   if (order.status !== "shipped") return { error: "Todavía no se ha registrado el envío." };
   const score = String(form.get("score") ?? "");
-  if (!["good", "normal", "bad"].includes(score)) return { error: "Selecciona una valoración." };
+  if (!["good", "normal", "bad"].includes(score)) return { error: "Selecciona una calificación." };
   const body = String(form.get("body") ?? "").trim();
   run("UPDATE orders SET status = 'received', received_at = ? WHERE id = ?", [nowIso(), id]);
   run("INSERT INTO reviews (id, order_id, rater_id, ratee_id, score, body, created_at) VALUES (?,?,?,?,?,?,?)",
     [newId("rv_"), id, user.id, order.seller_id, score, body, nowIso()]);
-  notify({ userId: order.seller_id, kind: "review", title: "Han confirmado la recepción", body: "Valora a quien te ha comprado para cerrar la transacción.", link: `/transaction/${id}` });
+  notify({ userId: order.seller_id, kind: "review", title: "Han confirmado la recepción", body: "Califica a quien te ha comprado para cerrar la transacción.", link: `/transaction/${id}` });
   revalidatePath(`/transaction/${id}`);
   return { ok: "¡Gracias! Has confirmado la recepción." };
 }
@@ -485,10 +538,10 @@ export async function rateBuyerAction(_prev: ActionState, form: FormData): Promi
   if (!user) redirect("/login");
   const id = String(form.get("order_id") ?? "");
   const order = loadOrder(id);
-  if (!order || order.seller_id !== user.id) return { error: "No puedes valorar esta transacción." };
+  if (!order || order.seller_id !== user.id) return { error: "No puedes calificar esta transacción." };
   if (order.status !== "received") return { error: "Aún falta que confirmen la recepción." };
   const score = String(form.get("score") ?? "");
-  if (!["good", "normal", "bad"].includes(score)) return { error: "Selecciona una valoración." };
+  if (!["good", "normal", "bad"].includes(score)) return { error: "Selecciona una calificación." };
   const body = String(form.get("body") ?? "").trim();
   const item = get<Item>("SELECT * FROM items WHERE id = ?", [order.item_id]);
 
@@ -496,15 +549,20 @@ export async function rateBuyerAction(_prev: ActionState, form: FormData): Promi
     run("INSERT INTO reviews (id, order_id, rater_id, ratee_id, score, body, created_at) VALUES (?,?,?,?,?,?,?)",
       [newId("rv_"), id, user.id, order.buyer_id, score, body, nowIso()]);
     run("UPDATE orders SET status = 'done', completed_at = ? WHERE id = ?", [nowIso(), id]);
-    run("UPDATE items SET status = 'sold', updated_at = ? WHERE id = ?", [nowIso(), order.item_id]);
+    const current = get<Item>("SELECT * FROM items WHERE id = ?", [order.item_id]);
+    if (current && current.shop_id && current.stock > 0) {
+      run("UPDATE items SET status = 'on_sale', updated_at = ? WHERE id = ?", [nowIso(), order.item_id]);
+    } else if (current && current.status !== "sold") {
+      run("UPDATE items SET status = 'sold', updated_at = ? WHERE id = ?", [nowIso(), order.item_id]);
+    }
     run("UPDATE users SET balance = balance + ? WHERE id = ?", [order.payout, user.id]);
     ledgerEntry(user.id, "balance", order.payout, `Venta de «${item?.title ?? ""}»`);
   });
 
-  notify({ userId: order.buyer_id, kind: "review", title: "Transacción finalizada", body: "Ya puedes ver la valoración que has recibido.", link: `/transaction/${id}` });
+  notify({ userId: order.buyer_id, kind: "review", title: "Transacción finalizada", body: "Ya puedes ver la calificación que has recibido.", link: `/transaction/${id}` });
   revalidatePath(`/transaction/${id}`);
   revalidatePath("/mypage/balance");
-  return { ok: "Transacción finalizada. El importe se ha añadido a tu saldo." };
+  return { ok: "Transacción finalizada. El monto se ha agregado a tu saldo." };
 }
 
 export async function cancelOrderAction(formData: FormData) {
@@ -519,7 +577,17 @@ export async function cancelOrderAction(formData: FormData) {
 
   tx(() => {
     run("UPDATE orders SET status = 'cancelled', completed_at = ? WHERE id = ?", [nowIso(), id]);
-    run("UPDATE items SET status = 'on_sale', updated_at = ? WHERE id = ?", [nowIso(), order.item_id]);
+    if (order.shop_id) {
+      // En Mercado Shops se devuelve el inventario reservado.
+      run("UPDATE items SET status = 'on_sale', stock = stock + ?, updated_at = ? WHERE id = ?",
+        [order.quantity, nowIso(), order.item_id]);
+      if (order.variant_label) {
+        run("UPDATE item_variants SET stock = stock + ? WHERE item_id = ? AND label = ?",
+          [order.quantity, order.item_id, order.variant_label]);
+      }
+    } else {
+      run("UPDATE items SET status = 'on_sale', updated_at = ? WHERE id = ?", [nowIso(), order.item_id]);
+    }
     if (order.points_used > 0) {
       run("UPDATE users SET points = points + ? WHERE id = ?", [order.points_used, order.buyer_id]);
       ledgerEntry(order.buyer_id, "points", order.points_used, "Devolución de puntos por cancelación");
@@ -714,17 +782,17 @@ export async function requestPayoutAction(_prev: ActionState, form: FormData): P
   const iban = String(form.get("iban") ?? "").replace(/\s+/g, "").toUpperCase();
   const holder = String(form.get("holder") ?? "").trim();
   if (!Number.isFinite(amount) || amount < MIN_PAYOUT)
-    return { error: `El importe mínimo para transferir es de ${MIN_PAYOUT} €.` };
+    return { error: `El monto mínimo para transferir es de $${MIN_PAYOUT}.` };
   if (amount + PAYOUT_FEE > fresh.balance) return { error: "Saldo insuficiente (recuerda la comisión de transferencia)." };
-  if (!/^ES\d{22}$/.test(iban)) return { error: "Introduce un IBAN español válido (ES + 22 dígitos)." };
+  if (!/^\d{18}$/.test(iban)) return { error: "Escribe una CLABE interbancaria válida (18 dígitos)." };
   if (!holder) return { error: "Indica el titular de la cuenta." };
   tx(() => {
     run("INSERT INTO payouts (id, user_id, amount, fee, iban, holder, status, created_at) VALUES (?,?,?,?,?,?,'pending',?)",
       [newId("p_"), user.id, amount, PAYOUT_FEE, iban, holder, nowIso()]);
     run("UPDATE users SET balance = balance - ? WHERE id = ?", [amount + PAYOUT_FEE, user.id]);
-    ledgerEntry(user.id, "balance", -(amount + PAYOUT_FEE), `Transferencia a ${iban.slice(0, 8)}···`);
+    ledgerEntry(user.id, "balance", -(amount + PAYOUT_FEE), `Transferencia a CLABE ${iban.slice(0, 6)}···`);
   });
-  notify({ userId: user.id, kind: "news", title: "Transferencia solicitada", body: `Recibirás ${amount} € en 2-4 días laborables.`, link: "/mypage/balance" });
+  notify({ userId: user.id, kind: "news", title: "Transferencia solicitada", body: `Recibirás $${amount} en 2 a 4 días hábiles.`, link: "/mypage/balance" });
   revalidatePath("/mypage/balance");
   return { ok: "Solicitud de transferencia registrada." };
 }
@@ -733,11 +801,11 @@ export async function buyPointsAction(_prev: ActionState, form: FormData): Promi
   const user = await currentUser();
   if (!user) redirect("/login?next=/mypage/points");
   const amount = Math.round(Number(form.get("amount")));
-  if (![5, 10, 20, 50, 100].includes(amount)) return { error: "Selecciona un importe válido." };
+  if (![100, 200, 500, 1000, 2000].includes(amount)) return { error: "Selecciona un monto válido." };
   run("UPDATE users SET points = points + ? WHERE id = ?", [amount, user.id]);
   ledgerEntry(user.id, "points", amount, "Compra de puntos con tarjeta");
   revalidatePath("/mypage/points");
-  return { ok: `Has añadido ${amount} puntos.` };
+  return { ok: `Has agregado ${amount} puntos.` };
 }
 
 export async function convertBalanceToPointsAction(_prev: ActionState, form: FormData): Promise<ActionState> {
@@ -745,7 +813,7 @@ export async function convertBalanceToPointsAction(_prev: ActionState, form: For
   if (!user) redirect("/login?next=/mypage/points");
   const amount = Math.round(Number(form.get("amount")));
   const fresh = get<User>("SELECT * FROM users WHERE id = ?", [user.id])!;
-  if (!Number.isFinite(amount) || amount <= 0) return { error: "Introduce un importe válido." };
+  if (!Number.isFinite(amount) || amount <= 0) return { error: "Introduce un monto válido." };
   if (amount > fresh.balance) return { error: "No tienes saldo suficiente." };
   tx(() => {
     run("UPDATE users SET balance = balance - ?, points = points + ? WHERE id = ?", [amount, amount, user.id]);
@@ -753,7 +821,7 @@ export async function convertBalanceToPointsAction(_prev: ActionState, form: For
     ledgerEntry(user.id, "points", amount, "Conversión de saldo a puntos");
   });
   revalidatePath("/mypage/points");
-  return { ok: `Has convertido ${amount} € de saldo en puntos.` };
+  return { ok: `Convertiste $${amount} de saldo en puntos.` };
 }
 
 export async function reportAction(_prev: ActionState, form: FormData): Promise<ActionState> {
@@ -766,4 +834,233 @@ export async function reportAction(_prev: ActionState, form: FormData): Promise<
   run("INSERT INTO reports (id, user_id, target, target_id, reason, body, created_at) VALUES (?,?,?,?,?,?,?)",
     [newId("rp_"), user.id, target, targetId, reason, String(form.get("body") ?? "").trim(), nowIso()]);
   return { ok: "Gracias por avisarnos. Nuestro equipo lo revisará." };
+}
+
+/* ============================== Mercado Shops ================================= */
+
+function slugifyShop(name: string) {
+  const base = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 28) || "tienda";
+  let slug = base;
+  let i = 1;
+  while (get("SELECT 1 AS x FROM shops WHERE slug = ?", [slug])) slug = `${base}-${++i}`;
+  return slug;
+}
+
+export async function createShopAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) redirect("/login?next=/mypage/shop/new");
+  if (get("SELECT 1 AS x FROM shops WHERE owner_id = ?", [user.id]))
+    return { error: "Ya tienes una tienda registrada." };
+
+  const name = String(form.get("name") ?? "").trim();
+  const description = String(form.get("description") ?? "").trim();
+  const category = String(form.get("category") ?? "").trim();
+  const businessType = String(form.get("business_type") ?? "persona_fisica");
+  const legalName = String(form.get("legal_name") ?? "").trim();
+  const rfc = String(form.get("rfc") ?? "").trim().toUpperCase();
+  const legalAddress = String(form.get("legal_address") ?? "").trim();
+  const legalPhone = String(form.get("legal_phone") ?? "").replace(/\s+/g, "");
+  const legalEmail = String(form.get("legal_email") ?? "").trim().toLowerCase();
+  const returnPolicy = String(form.get("return_policy") ?? "").trim();
+  const deliveryNote = String(form.get("delivery_note") ?? "").trim();
+  const shipFrom = String(form.get("ship_from") ?? "").trim();
+
+  if (name.length < 3) return { error: "El nombre de la tienda debe tener al menos 3 caracteres." };
+  if (!category) return { error: "Elige el giro de tu tienda." };
+  if (!legalName) return { error: "Indica el nombre o razón social del titular." };
+  if (!/^([A-ZÑ&]{3,4})\d{6}[A-Z0-9]{3}$/.test(rfc))
+    return { error: "El RFC no tiene un formato válido (ej. XAXX010101000)." };
+  if (!/^\d{10}$/.test(legalPhone)) return { error: "El teléfono debe tener 10 dígitos." };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(legalEmail)) return { error: "El correo de contacto no es válido." };
+  if (!legalAddress) return { error: "Indica el domicilio fiscal o comercial." };
+
+  const shopId = newId("sh_");
+  run(
+    `INSERT INTO shops (id, owner_id, name, slug, description, category, logo_seed, cover_emoji,
+      business_type, legal_name, rfc, legal_address, legal_phone, legal_email, return_policy,
+      delivery_note, ship_from, status, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?)`,
+    [shopId, user.id, name, slugifyShop(name), description, category,
+     String(Math.floor(Math.random() * 12)), String(form.get("cover_emoji") ?? "🛍️"),
+     businessType, legalName, rfc, legalAddress, legalPhone, legalEmail, returnPolicy,
+     deliveryNote, shipFrom, nowIso()],
+  );
+  notify({
+    userId: user.id, kind: "shop", title: "Recibimos tu solicitud de Mercado Shops",
+    body: "Revisaremos tus datos fiscales. Te avisaremos en cuanto se active la tienda.",
+    link: "/mypage/shop",
+  });
+  revalidatePath("/mypage/shop");
+  redirect("/mypage/shop");
+}
+
+export async function updateShopAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) redirect("/login?next=/mypage/shop/settings");
+  const shop = get<Shop>("SELECT * FROM shops WHERE owner_id = ?", [user.id]);
+  if (!shop) return { error: "Todavía no tienes una tienda." };
+
+  const name = String(form.get("name") ?? "").trim();
+  const legalPhone = String(form.get("legal_phone") ?? "").replace(/\s+/g, "");
+  const legalEmail = String(form.get("legal_email") ?? "").trim().toLowerCase();
+  if (name.length < 3) return { error: "El nombre de la tienda debe tener al menos 3 caracteres." };
+  if (!/^\d{10}$/.test(legalPhone)) return { error: "El teléfono debe tener 10 dígitos." };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(legalEmail)) return { error: "El correo de contacto no es válido." };
+
+  run(
+    `UPDATE shops SET name=?, description=?, category=?, cover_emoji=?, logo_seed=?, business_type=?,
+      legal_name=?, rfc=?, legal_address=?, legal_phone=?, legal_email=?, return_policy=?,
+      delivery_note=?, ship_from=? WHERE id = ?`,
+    [name, String(form.get("description") ?? "").trim(), String(form.get("category") ?? ""),
+     String(form.get("cover_emoji") ?? shop.cover_emoji), String(form.get("logo_seed") ?? shop.logo_seed),
+     String(form.get("business_type") ?? shop.business_type), String(form.get("legal_name") ?? "").trim(),
+     String(form.get("rfc") ?? "").trim().toUpperCase(), String(form.get("legal_address") ?? "").trim(),
+     legalPhone, legalEmail, String(form.get("return_policy") ?? "").trim(),
+     String(form.get("delivery_note") ?? "").trim(), String(form.get("ship_from") ?? "").trim(), shop.id],
+  );
+  revalidatePath("/mypage/shop/settings");
+  revalidatePath(`/shop/${shop.slug}`);
+  return { ok: "Datos de la tienda actualizados." };
+}
+
+/** Simula la revisión del equipo de Mercado Shops (proyecto de demostración). */
+export async function reviewShopAction() {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  const shop = get<Shop>("SELECT * FROM shops WHERE owner_id = ?", [user.id]);
+  if (!shop || shop.status === "active") return;
+  run("UPDATE shops SET status = 'active' WHERE id = ?", [shop.id]);
+  notify({
+    userId: user.id, kind: "shop", title: "¡Tu tienda ya está activa!",
+    body: "Ya puedes publicar productos con inventario en Mercado Shops.",
+    link: `/shop/${shop.slug}`,
+  });
+  revalidatePath("/mypage/shop");
+}
+
+export async function toggleShopFollowAction(formData: FormData) {
+  const user = await currentUser();
+  const shopId = String(formData.get("shop_id") ?? "");
+  const slug = String(formData.get("slug") ?? "");
+  if (!user) redirect(`/login?next=/shop/${slug}`);
+  const following = get("SELECT 1 AS x FROM shop_follows WHERE user_id = ? AND shop_id = ?", [user.id, shopId]);
+  if (following) {
+    run("DELETE FROM shop_follows WHERE user_id = ? AND shop_id = ?", [user.id, shopId]);
+  } else {
+    run("INSERT INTO shop_follows (user_id, shop_id, created_at) VALUES (?,?,?)", [user.id, shopId, nowIso()]);
+    const shop = get<Shop>("SELECT * FROM shops WHERE id = ?", [shopId]);
+    if (shop) {
+      notify({ userId: shop.owner_id, kind: "shop", title: `${user.name} sigue tu tienda`, link: `/shop/${shop.slug}` });
+    }
+  }
+  revalidatePath(`/shop/${slug}`);
+  revalidatePath("/mypage/shops");
+}
+
+export async function saveShopItemAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) redirect("/login?next=/mypage/shop/items/new");
+  const shop = get<Shop>("SELECT * FROM shops WHERE owner_id = ?", [user.id]);
+  if (!shop) return { error: "Primero abre tu tienda en Mercado Shops." };
+  if (shop.status !== "active") return { error: "Tu tienda todavía está en revisión." };
+
+  const id = String(form.get("id") ?? "").trim() || newId("m");
+  const existing = get<Item>("SELECT * FROM items WHERE id = ?", [id]);
+  if (existing && existing.seller_id !== user.id) return { error: "No puedes editar este producto." };
+
+  const asDraft = String(form.get("intent") ?? "") === "draft";
+  const title = String(form.get("title") ?? "").trim();
+  const price = Math.round(num(form, "price"));
+  const categoryId = Number(form.get("category_id")) || null;
+
+  const variantLabels = form.getAll("variant_label").map((v) => String(v).trim());
+  const variantStocks = form.getAll("variant_stock").map((v) => Math.max(0, Math.round(Number(v) || 0)));
+  const variantSkus = form.getAll("variant_sku").map((v) => String(v).trim());
+  const variants = variantLabels
+    .map((label, i) => ({ label, stock: variantStocks[i] ?? 0, sku: variantSkus[i] ?? "" }))
+    .filter((v) => v.label);
+
+  const stockField = Math.max(0, Math.round(Number(form.get("stock")) || 0));
+  const stock = variants.length ? variants.reduce((sum, v) => sum + v.stock, 0) : stockField;
+
+  if (!asDraft) {
+    if (title.length < 3) return { error: "El título debe tener al menos 3 caracteres." };
+    if (!categoryId) return { error: "Selecciona una categoría." };
+    if (price < MIN_PRICE || price > MAX_PRICE)
+      return { error: `El precio debe estar entre $${MIN_PRICE} y $${MAX_PRICE}.` };
+    if (stock < 1) return { error: "Indica el inventario disponible (al menos 1 pieza)." };
+  }
+
+  const values: Array<string | number | null> = [
+    title,
+    String(form.get("description") ?? "").trim(),
+    price,
+    categoryId,
+    Number(form.get("brand_id")) || null,
+    String(form.get("size") ?? ""),
+    String(form.get("color") ?? ""),
+    1, // los productos de tienda son nuevos salvo que se indique lo contrario
+    String(form.get("shipping_payer") ?? "seller"),
+    String(form.get("shipping_method") ?? "facil"),
+    String(form.get("ship_from") ?? shop.ship_from),
+    Number(form.get("ship_days")) || 1,
+    stock,
+  ];
+
+  if (existing) {
+    run(
+      `UPDATE items SET title=?, description=?, price=?, category_id=?, brand_id=?, size=?, color=?,
+        condition=?, shipping_payer=?, shipping_method=?, ship_from=?, ship_days=?, stock=?,
+        status=?, offers_enabled=0, shop_id=?, updated_at=? WHERE id=?`,
+      [...values, asDraft ? "draft" : stock > 0 ? "on_sale" : "stopped", shop.id, nowIso(), id],
+    );
+  } else {
+    run(
+      `INSERT INTO items (id, seller_id, title, description, price, category_id, brand_id, size, color,
+        condition, shipping_payer, shipping_method, ship_from, ship_days, stock, status,
+        offers_enabled, shop_id, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?)`,
+      [id, user.id, ...values, asDraft ? "draft" : "on_sale", shop.id, nowIso(), nowIso()],
+    );
+  }
+
+  for (const imgId of form.getAll("remove_image").map(String)) {
+    run("DELETE FROM item_images WHERE id = ? AND item_id = ?", [Number(imgId), id]);
+  }
+  const maxPos = get<{ p: number | null }>("SELECT MAX(position) AS p FROM item_images WHERE item_id = ?", [id])?.p;
+  await collectImages(form, id, (maxPos ?? -1) + 1);
+
+  run("DELETE FROM item_variants WHERE item_id = ?", [id]);
+  variants.forEach((variant, index) => {
+    run("INSERT INTO item_variants (item_id, label, sku, stock, position) VALUES (?,?,?,?,?)",
+      [id, variant.label, variant.sku, variant.stock, index]);
+  });
+
+  if (!asDraft) {
+    const image = get<{ url: string }>("SELECT url FROM item_images WHERE item_id = ? ORDER BY position LIMIT 1", [id])?.url ?? "";
+    const followers = all<{ user_id: string }>("SELECT user_id FROM shop_follows WHERE shop_id = ?", [shop.id]);
+    for (const follower of followers) {
+      notify({ userId: follower.user_id, kind: "shop", title: `${shop.name} publicó un producto nuevo`, body: title, link: `/item/${id}`, image });
+    }
+  }
+
+  revalidatePath("/mypage/shop/items");
+  revalidatePath(`/shop/${shop.slug}`);
+  redirect(asDraft ? "/mypage/shop/items?tab=draft" : `/item/${id}?published=1`);
+}
+
+export async function updateStockAction(formData: FormData) {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  const id = String(formData.get("id") ?? "");
+  const stock = Math.max(0, Math.round(Number(formData.get("stock")) || 0));
+  const item = get<Item>("SELECT * FROM items WHERE id = ?", [id]);
+  if (!item || item.seller_id !== user.id || !item.shop_id) return;
+  const hasVariants = !!get("SELECT 1 AS x FROM item_variants WHERE item_id = ?", [id]);
+  if (hasVariants) return;
+  run("UPDATE items SET stock = ?, status = ?, updated_at = ? WHERE id = ?",
+    [stock, stock > 0 ? "on_sale" : "stopped", nowIso(), id]);
+  revalidatePath("/mypage/shop/items");
+  revalidatePath(`/item/${id}`);
 }

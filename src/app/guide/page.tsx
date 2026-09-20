@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { CONDITIONS, FEE_RATE, SHIPPING_METHODS, MIN_PAYOUT, PAYOUT_FEE } from "@/lib/constants";
+import {
+  CASH_FEE, CONDITIONS, FEE_RATE, MIN_PAYOUT, MSI_MIN, PAYOUT_FEE, SHIPPING_METHODS,
+} from "@/lib/constants";
+import { money } from "@/lib/format";
 
 export const metadata = { title: "Cómo funciona Mercado" };
 
@@ -21,7 +24,7 @@ export default function GuidePage() {
             ["Elige categoría y estado", "Cuanto más precisa sea la ficha, menos preguntas recibirás."],
             ["Fija el precio", `Te mostramos la comisión del ${FEE_RATE * 100} % y lo que recibirás antes de publicar.`],
             ["Envía en 24-48 h", "Usa el método de envío que elegiste y anota el número de seguimiento."],
-            ["Cobra", "Cuando ambas partes valoran, el importe se añade a tu saldo."],
+            ["Cobra", "Cuando ambas partes valoran, el monto se agrega a tu saldo."],
           ].map(([title, body], i) => (
             <li key={title} className="card flex gap-3 p-4">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
@@ -42,7 +45,7 @@ export default function GuidePage() {
         <ol className="mt-3 space-y-2 text-sm text-muted">
           <li>1. Busca por palabra clave, categoría, marca, talla o precio y guarda tus búsquedas.</li>
           <li>2. Pregunta en los comentarios o envía una oferta si quien vende las acepta.</li>
-          <li>3. Paga con tarjeta, saldo, puntos, Bizum, PayPal, transferencia o en tienda.</li>
+          <li>3. Paga con tarjeta, meses sin intereses, efectivo en tiendas, SPEI, PayPal, saldo o puntos.</li>
           <li>4. Recibe el paquete, revísalo y confirma la recepción valorando la transacción.</li>
           <li>5. Solo entonces liberamos el dinero a quien vende.</li>
         </ol>
@@ -69,7 +72,7 @@ export default function GuidePage() {
               <dd className="text-muted">{method.hint}</dd>
               {method.cost.length > 0 && (
                 <dd className="mt-1 text-xs text-muted">
-                  Tarifas: {method.cost.map((c) => `hasta ${c.max} kg · ${c.price.toFixed(2)} €`).join(" / ")}
+                  Tarifas: {method.cost.map((c) => `hasta ${c.max} kg · ${money(c.price)}`).join(" / ")}
                 </dd>
               )}
             </div>
@@ -80,13 +83,31 @@ export default function GuidePage() {
         </p>
       </section>
 
+      <section id="shops" className="mt-10 scroll-mt-28">
+        <h2 className="text-lg font-bold">Mercado Shops</h2>
+        <p className="mt-2 text-sm text-muted">
+          Si vendes como negocio puedes abrir una tienda gratis: publicas productos con inventario
+          y variantes (talla, color, sabor), recibes varios pedidos del mismo artículo y tus datos
+          fiscales se publican en la ficha «Información del vendedor», como lo pide la Ley Federal
+          de Protección al Consumidor.
+        </p>
+        <ul className="card mt-3 divide-y divide-line text-sm">
+          <li className="flex justify-between p-3"><span>Abrir la tienda</span><span className="font-bold">Gratis</span></li>
+          <li className="flex justify-between p-3"><span>Comisión por venta</span><span className="font-bold">{FEE_RATE * 100} %</span></li>
+          <li className="flex justify-between p-3"><span>Inventario y variantes</span><span className="font-bold">Incluidos</span></li>
+          <li className="flex justify-between p-3"><span>Meses sin intereses para tus clientes</span><span className="font-bold">3, 6, 9 y 12</span></li>
+        </ul>
+        <Link href="/mypage/shop/new" className="btn-primary mt-4 inline-flex">Abrir mi tienda</Link>
+      </section>
+
       <section id="comisiones" className="mt-10 scroll-mt-28">
         <h2 className="text-lg font-bold">Comisiones y cobros</h2>
         <ul className="card mt-3 divide-y divide-line text-sm">
           <li className="flex justify-between p-3"><span>Publicar un artículo</span><span className="font-bold">Gratis</span></li>
           <li className="flex justify-between p-3"><span>Comisión de venta</span><span className="font-bold">{FEE_RATE * 100} % del precio</span></li>
-          <li className="flex justify-between p-3"><span>Transferencia a tu banco</span><span className="font-bold">{PAYOUT_FEE} € (mínimo {MIN_PAYOUT} €)</span></li>
-          <li className="flex justify-between p-3"><span>Pago en tienda o cajero</span><span className="font-bold">1 €</span></li>
+          <li className="flex justify-between p-3"><span>Transferencia a tu banco (CLABE)</span><span className="font-bold">{money(PAYOUT_FEE)} (mínimo {money(MIN_PAYOUT)})</span></li>
+          <li className="flex justify-between p-3"><span>Pago en efectivo en tiendas</span><span className="font-bold">{money(CASH_FEE)}</span></li>
+          <li className="flex justify-between p-3"><span>Meses sin intereses</span><span className="font-bold">Desde {money(MSI_MIN)}</span></li>
         </ul>
       </section>
     </article>

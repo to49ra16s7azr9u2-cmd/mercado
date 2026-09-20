@@ -93,6 +93,9 @@ export async function Header() {
                 </Link>
               ))}
             </div>
+            <Link href="/shops" className="whitespace-nowrap px-3 py-2.5 text-sm font-bold text-brand-darker">
+              🏪 Shops
+            </Link>
             <Link href="/search?sort=likes" className="whitespace-nowrap px-3 py-2.5 text-sm font-bold text-brand-darker">
               Tendencias
             </Link>

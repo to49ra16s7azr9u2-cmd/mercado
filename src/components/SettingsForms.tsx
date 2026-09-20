@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { SubmitButton } from "./SubmitButton";
 import type { ActionState } from "@/lib/actions";
-import { REGIONS } from "@/lib/constants";
+import { MIN_PAYOUT, PAYOUT_FEE, REGIONS } from "@/lib/constants";
 import { Avatar } from "./Avatar";
 
 type Action = (state: ActionState, form: FormData) => Promise<ActionState>;
@@ -90,14 +90,14 @@ export function AddressForm({
           <input id="addr_zip" name="addr_zip" defaultValue={address.zip} className="input" inputMode="numeric" required />
         </div>
         <div>
-          <label className="label" htmlFor="addr_region">Provincia / comunidad *</label>
+          <label className="label" htmlFor="addr_region">Estado *</label>
           <select id="addr_region" name="addr_region" defaultValue={address.region} className="input" required>
             <option value="">Selecciona…</option>
             {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
         <div>
-          <label className="label" htmlFor="addr_city">Localidad *</label>
+          <label className="label" htmlFor="addr_city">Municipio o alcaldía *</label>
           <input id="addr_city" name="addr_city" defaultValue={address.city} className="input" required />
         </div>
         <div>
@@ -105,7 +105,7 @@ export function AddressForm({
           <input id="addr_phone" name="addr_phone" defaultValue={address.phone} className="input" inputMode="tel" />
         </div>
         <div className="sm:col-span-2">
-          <label className="label" htmlFor="addr_line">Dirección (calle, número, piso) *</label>
+          <label className="label" htmlFor="addr_line">Dirección (calle, número, colonia) *</label>
           <input id="addr_line" name="addr_line" defaultValue={address.line} className="input" required />
         </div>
       </div>
@@ -171,7 +171,7 @@ export function CardForm({ action }: { action: Action }) {
   return (
     <form action={formAction} className="card space-y-3 p-4">
       <Feedback state={state} />
-      <h2 className="section-title">Añadir tarjeta</h2>
+      <h2 className="section-title">Agregar tarjeta</h2>
       <div>
         <label className="label" htmlFor="number">Número de tarjeta</label>
         <input id="number" name="number" className="input" inputMode="numeric" placeholder="4242 4242 4242 4242" required />
@@ -188,12 +188,12 @@ export function CardForm({ action }: { action: Action }) {
       </div>
       <div>
         <label className="label" htmlFor="holder">Titular</label>
-        <input id="holder" name="holder" className="input" placeholder="ANA GARCIA" required />
+        <input id="holder" name="holder" className="input" placeholder="ANA LOPEZ" required />
       </div>
       <p className="text-[11px] text-muted">
-        Demostración: no se procesa ningún pago real y solo se guardan los cuatro últimos dígitos.
+        Demostración: no se procesa ningún pago real y solo se guardan los últimos cuatro dígitos.
       </p>
-      <SubmitButton className="btn-primary">Añadir tarjeta</SubmitButton>
+      <SubmitButton className="btn-primary">Agregar tarjeta</SubmitButton>
     </form>
   );
 }
@@ -205,12 +205,12 @@ export function PayoutForm({ action, balance }: { action: Action; balance: numbe
       <Feedback state={state} />
       <h2 className="section-title">Solicitar transferencia</h2>
       <div>
-        <label className="label" htmlFor="amount">Importe (mínimo 20 €, comisión 2 €)</label>
-        <input id="amount" name="amount" type="number" min={20} max={balance} className="input" required />
+        <label className="label" htmlFor="amount">Monto (mínimo ${MIN_PAYOUT}, comisión ${PAYOUT_FEE})</label>
+        <input id="amount" name="amount" type="number" min={MIN_PAYOUT} max={balance} className="input" required />
       </div>
       <div>
-        <label className="label" htmlFor="iban">IBAN</label>
-        <input id="iban" name="iban" className="input" placeholder="ES91 2100 0418 4502 0005 1332" required />
+        <label className="label" htmlFor="iban">CLABE interbancaria (18 dígitos)</label>
+        <input id="iban" name="iban" className="input" inputMode="numeric" placeholder="012180001234567895" required />
       </div>
       <div>
         <label className="label" htmlFor="holder">Titular de la cuenta</label>
@@ -237,9 +237,9 @@ export function PointsForm({
       <form action={buyFormAction} className="card space-y-3 p-4">
         <Feedback state={buyState} />
         <h2 className="section-title">Comprar puntos</h2>
-        <p className="text-xs text-muted">1 punto = 1 € de descuento en tus compras.</p>
+        <p className="text-xs text-muted">1 punto = $1 de descuento en tus compras.</p>
         <div className="grid grid-cols-3 gap-2">
-          {[5, 10, 20, 50, 100].map((amount) => (
+          {[100, 200, 500, 1000, 2000].map((amount) => (
             <label key={amount} className="cursor-pointer">
               <input type="radio" name="amount" value={amount} required className="peer sr-only" />
               <span className="block rounded-lg border border-line py-2 text-center text-sm font-bold peer-checked:border-brand peer-checked:bg-brand-soft">
@@ -253,7 +253,7 @@ export function PointsForm({
       <form action={convertFormAction} className="card space-y-3 p-4">
         <Feedback state={convertState} />
         <h2 className="section-title">Convertir saldo en puntos</h2>
-        <p className="text-xs text-muted">Saldo disponible: {balance} €</p>
+        <p className="text-xs text-muted">Saldo disponible: ${balance}</p>
         <input name="amount" type="number" min={1} max={balance} className="input" placeholder="Importe a convertir" required />
         <SubmitButton className="btn-outline">Convertir</SubmitButton>
       </form>

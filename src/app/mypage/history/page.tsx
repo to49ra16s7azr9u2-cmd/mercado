@@ -1,4 +1,4 @@
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { historyItems } from "@/lib/queries";
 import { clearHistoryAction } from "@/lib/actions";
 import { ItemGrid } from "@/components/ItemCard";
@@ -7,7 +7,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 export const metadata = { title: "Historial de visitas" };
 
 export default async function HistoryPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/history");
   const items = historyItems(user.id);
   return (
     <>

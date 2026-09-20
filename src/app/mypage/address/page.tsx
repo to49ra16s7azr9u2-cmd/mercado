@@ -1,11 +1,11 @@
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { updateAddressAction } from "@/lib/actions";
 import { AddressForm } from "@/components/SettingsForms";
 
 export const metadata = { title: "Dirección de envío" };
 
 export default async function AddressPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/address");
   return (
     <>
       <h1 className="text-xl font-bold">Dirección de envío</h1>

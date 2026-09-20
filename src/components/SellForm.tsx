@@ -123,7 +123,7 @@ export function SellForm({
             </div>
           ))}
           <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-line text-xs text-muted hover:border-brand hover:text-brand-darker">
-            <span className="text-xl">＋</span> Añadir
+            <span className="text-xl">＋</span> Agregar
             <input
               type="file"
               name="photos"
@@ -321,17 +321,17 @@ export function SellForm({
               className="input pl-7 text-lg font-bold"
               placeholder="0"
             />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-muted">€</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-muted">$</span>
           </div>
         </div>
         <dl className="divide-y divide-line rounded-lg bg-canvas px-3 text-sm">
           <div className="flex justify-between py-2">
             <dt className="text-muted">Comisión de venta (10 %)</dt>
-            <dd className="font-bold">− {fee} €</dd>
+            <dd className="font-bold">− ${fee}</dd>
           </div>
           <div className="flex justify-between py-2">
             <dt className="text-muted">Recibirás</dt>
-            <dd className="text-base font-black text-brand-darker">{payout} €</dd>
+            <dd className="text-base font-black text-brand-darker">${payout}</dd>
           </div>
         </dl>
         <label className="flex items-center gap-2 text-sm">

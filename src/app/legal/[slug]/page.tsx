@@ -4,51 +4,67 @@ type Doc = { title: string; updated: string; sections: { heading: string; body: 
 
 const DOCS: Record<string, Doc> = {
   terminos: {
-    title: "Términos de uso",
+    title: "Términos y condiciones de uso",
     updated: "1 de enero de 2026",
     sections: [
-      { heading: "1. Objeto", body: [
-        "Mercado es un mercado en línea que permite a personas particulares comprar y vender artículos de segunda mano. Mercado actúa como intermediario y no es propietario de los artículos publicados.",
-        "Este sitio es un proyecto de demostración: las transacciones no son reales y no generan obligaciones económicas.",
+      { heading: "1. Objeto y aceptación", body: [
+        "Mercado es una plataforma en línea que permite a personas usuarias y a tiendas de Mercado Shops ofrecer, comprar y vender artículos nuevos y de segunda mano en los Estados Unidos Mexicanos. Mercado actúa como intermediario y no es propietario de los artículos publicados.",
+        "Este sitio es un proyecto de demostración: las operaciones no son reales y no generan obligaciones económicas ni fiscales.",
       ]},
       { heading: "2. Cuenta de usuario", body: [
-        "Para publicar o comprar es necesario registrarse con una dirección de correo válida y mantener los datos actualizados.",
-        "Cada persona puede tener una sola cuenta y es responsable de la confidencialidad de su contraseña.",
+        "Para publicar o comprar debes registrarte con un correo electrónico válido, ser mayor de edad y mantener tus datos actualizados.",
+        "Cada persona puede tener una sola cuenta y es responsable de resguardar su contraseña.",
       ]},
-      { heading: "3. Publicación de artículos", body: [
-        "Quien publica garantiza que dispone del artículo, que puede venderlo legalmente y que la descripción es veraz.",
-        "Está prohibido publicar los artículos indicados en la política de artículos prohibidos.",
+      { heading: "3. Publicaciones", body: [
+        "Quien publica declara que cuenta con el artículo, que puede comercializarlo legalmente y que la descripción y las imágenes son veraces, conforme al artículo 32 de la Ley Federal de Protección al Consumidor.",
+        "Está prohibido publicar los artículos señalados en la política de artículos prohibidos.",
       ]},
-      { heading: "4. Compras y pagos", body: [
-        "El importe abonado por quien compra queda retenido por Mercado hasta que se confirma la recepción del artículo.",
-        "Mercado aplica una comisión del 10 % sobre el precio de venta.",
+      { heading: "4. Precios, pagos y facturación", body: [
+        "Todos los precios se expresan en pesos mexicanos (MXN) e incluyen impuestos.",
+        "El monto pagado por quien compra queda retenido por Mercado hasta que se confirma la recepción del artículo.",
+        "Mercado cobra una comisión del 10 % sobre el precio de venta. Las tiendas de Mercado Shops pueden emitir factura (CFDI) a solicitud de la persona compradora.",
       ]},
-      { heading: "5. Cancelaciones", body: [
-        "Se puede solicitar la cancelación mientras el artículo no haya sido enviado. Una vez enviado, ambas partes deben acordarla.",
+      { heading: "5. Envíos y entregas", body: [
+        "Los envíos con guía prepagada de Mercado incluyen rastreo y protección. Las direcciones permanecen ocultas para la contraparte.",
+        "Los plazos de entrega son estimados y pueden variar por causas atribuibles a la paquetería.",
       ]},
-      { heading: "6. Conducta prohibida", body: [
-        "Se prohíbe pagar o cobrar fuera de la plataforma, publicar productos falsificados, suplantar identidades o manipular las valoraciones.",
+      { heading: "6. Cancelaciones y devoluciones", body: [
+        "Puede solicitarse la cancelación mientras el artículo no haya sido enviado. Después del envío se requiere el acuerdo de ambas partes.",
+        "Las tiendas de Mercado Shops publican su política de devoluciones en la ficha «Información del vendedor».",
       ]},
-      { heading: "7. Responsabilidad", body: [
-        "Mercado no responde por el estado de los artículos, pero media en los conflictos y puede retener o reembolsar el importe según el resultado.",
+      { heading: "7. Conductas prohibidas", body: [
+        "Se prohíbe pagar o cobrar fuera de la plataforma, comercializar productos apócrifos, suplantar identidades y manipular las calificaciones.",
+      ]},
+      { heading: "8. Responsabilidad y solución de controversias", body: [
+        "Mercado no es responsable del estado de los artículos, pero media en las controversias y puede retener o reembolsar el monto según el resultado.",
+        "Para cualquier controversia, las partes se someten a la Procuraduría Federal del Consumidor (Profeco) y, en su caso, a los tribunales competentes de la Ciudad de México.",
       ]},
     ],
   },
   privacidad: {
-    title: "Política de privacidad",
+    title: "Aviso de privacidad",
     updated: "1 de enero de 2026",
     sections: [
-      { heading: "Responsable del tratamiento", body: ["Mercado (proyecto de demostración). Contacto: ayuda@mercado.es."] },
-      { heading: "Datos que tratamos", body: [
-        "Datos de registro (nombre, correo), datos de envío, historial de compras y ventas, mensajes de transacción y datos de uso del sitio.",
-        "No almacenamos números completos de tarjeta: solo los cuatro últimos dígitos y la caducidad.",
+      { heading: "Responsable del tratamiento", body: [
+        "Mercado (proyecto de demostración), con domicilio en la Ciudad de México, es responsable del tratamiento de tus datos personales conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP). Contacto: ayuda@mercado.mx.",
+      ]},
+      { heading: "Datos que recabamos", body: [
+        "Datos de identificación y contacto (nombre, correo, teléfono), domicilio de envío, historial de compras y ventas, mensajes de la transacción y datos de navegación.",
+        "En Mercado Shops también recabamos datos fiscales (RFC, razón social y domicilio) que se publican en la ficha «Información del vendedor».",
+        "No almacenamos números completos de tarjeta: solo los últimos cuatro dígitos y la fecha de vencimiento.",
       ]},
       { heading: "Finalidades", body: [
-        "Gestionar tu cuenta, tramitar compras y envíos, prevenir fraudes, ofrecer recomendaciones y enviarte avisos que hayas activado.",
+        "Finalidades primarias: crear y administrar tu cuenta, procesar compras, envíos y pagos, prevenir fraudes y atender aclaraciones.",
+        "Finalidades secundarias: enviarte recomendaciones, avisos y promociones. Puedes oponerte en cualquier momento desde Configuración.",
       ]},
-      { heading: "Conservación", body: ["Conservamos los datos mientras la cuenta esté activa y durante los plazos legales aplicables."] },
-      { heading: "Tus derechos", body: [
-        "Puedes acceder, rectificar, suprimir, limitar y oponerte al tratamiento, así como solicitar la portabilidad, escribiendo a ayuda@mercado.es.",
+      { heading: "Transferencias", body: [
+        "Compartimos los datos necesarios con las empresas de paquetería y con los procesadores de pago para completar la operación. No transferimos datos a terceros con fines distintos sin tu consentimiento.",
+      ]},
+      { heading: "Derechos ARCO", body: [
+        "Puedes acceder, rectificar, cancelar u oponerte al tratamiento de tus datos, así como revocar tu consentimiento, escribiendo a ayuda@mercado.mx. Responderemos en un plazo máximo de 20 días hábiles.",
+      ]},
+      { heading: "Cambios al aviso", body: [
+        "Cualquier modificación a este aviso de privacidad se publicará en esta misma página.",
       ]},
     ],
   },
@@ -56,13 +72,13 @@ const DOCS: Record<string, Doc> = {
     title: "Política de cookies",
     updated: "1 de enero de 2026",
     sections: [
-      { heading: "Qué son", body: ["Pequeños archivos que el sitio guarda en tu navegador para recordar tu sesión y tus preferencias."] },
-      { heading: "Cookies que usamos", body: [
-        "Técnicas: imprescindibles para iniciar sesión y mantener el carrito de la transacción.",
+      { heading: "Qué son", body: ["Archivos pequeños que el sitio guarda en tu navegador para recordar tu sesión y tus preferencias."] },
+      { heading: "Cookies que utilizamos", body: [
+        "Necesarias: mantienen tu sesión iniciada y protegen los formularios.",
         "De personalización: recuerdan tus filtros y búsquedas recientes.",
-        "Analíticas: nos ayudan a entender qué secciones se usan más de forma agregada.",
+        "Analíticas: nos ayudan a entender de forma agregada qué secciones se usan más.",
       ]},
-      { heading: "Cómo gestionarlas", body: ["Puedes bloquearlas desde la configuración de tu navegador, aunque algunas funciones dejarán de estar disponibles."] },
+      { heading: "Cómo gestionarlas", body: ["Puedes bloquearlas desde la configuración de tu navegador; algunas funciones dejarán de estar disponibles."] },
     ],
   },
   prohibidos: {
@@ -70,17 +86,41 @@ const DOCS: Record<string, Doc> = {
     updated: "1 de enero de 2026",
     sections: [
       { heading: "No se pueden vender en Mercado", body: [
-        "Armas, munición y réplicas realistas.",
-        "Drogas, tabaco, alcohol y medicamentos con receta.",
-        "Productos falsificados o copias no autorizadas.",
-        "Animales vivos y especies protegidas.",
-        "Datos personales, cuentas de usuario y claves de acceso.",
-        "Alimentos sin etiquetado ni trazabilidad y cosméticos abiertos de uso íntimo.",
-        "Contenido para adultos y material que incite al odio.",
-        "Dinero en curso legal, tarjetas de crédito y servicios financieros.",
+        "Armas, municiones y réplicas realistas.",
+        "Drogas, tabaco, bebidas alcohólicas y medicamentos que requieren receta.",
+        "Productos apócrifos o copias no autorizadas.",
+        "Animales vivos y especies protegidas por la NOM-059-SEMARNAT.",
+        "Datos personales, cuentas de usuario y contraseñas.",
+        "Alimentos sin etiquetado ni trazabilidad y cosméticos de uso íntimo ya abiertos.",
+        "Contenido para adultos y material que incite al odio o a la violencia.",
+        "Dinero de curso legal, tarjetas bancarias y servicios financieros.",
+        "Piezas arqueológicas y bienes del patrimonio cultural de la nación.",
       ]},
       { heading: "Consecuencias", body: [
-        "Retiramos la publicación, podemos suspender la cuenta y, si procede, lo comunicamos a las autoridades competentes.",
+        "Retiramos la publicación, podemos suspender la cuenta o la tienda y, cuando corresponde, damos aviso a las autoridades competentes.",
+      ]},
+    ],
+  },
+  shops: {
+    title: "Reglas de Mercado Shops",
+    updated: "1 de enero de 2026",
+    sections: [
+      { heading: "Quién puede abrir una tienda", body: [
+        "Personas físicas con actividad empresarial y personas morales con RFC vigente. El alta es gratuita y está sujeta a revisión de los datos fiscales.",
+      ]},
+      { heading: "Obligaciones de la tienda", body: [
+        "Publicar de forma visible nombre o razón social, RFC, domicilio, teléfono, correo de atención y política de devoluciones.",
+        "Mantener el inventario actualizado y enviar dentro del plazo publicado.",
+        "Emitir comprobante fiscal (CFDI) cuando la persona compradora lo solicite.",
+      ]},
+      { heading: "Inventario y variantes", body: [
+        "Cada producto puede tener varias piezas y variantes de talla, color o presentación con inventario independiente. El inventario se descuenta al confirmarse el pago y se restituye si la operación se cancela.",
+      ]},
+      { heading: "Comisiones", body: [
+        "La comisión por venta es del 10 % del precio del producto. No hay cuota de alta ni mensualidad.",
+      ]},
+      { heading: "Suspensión", body: [
+        "Mercado puede suspender una tienda que incumpla estas reglas, la Ley Federal de Protección al Consumidor o la política de artículos prohibidos.",
       ]},
     ],
   },

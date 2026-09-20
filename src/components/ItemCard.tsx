@@ -37,6 +37,12 @@ export function ItemCard({ item, compact = false }: { item: ItemCardType; compac
         </span>
       </div>
       <div className={compact ? "p-2" : "p-2.5"}>
+        {item.shop_slug && (
+          <p className="mb-0.5 flex items-center gap-1 truncate text-[10px] font-bold text-brand-darker">
+            <span className="rounded bg-brand-soft px-1 py-px">Shops</span>
+            <span className="truncate text-muted">{item.shop_name}</span>
+          </p>
+        )}
         <p className="line-clamp-2 text-[13px] leading-snug text-ink">{item.title}</p>
         <p className="mt-1 text-[15px] font-bold text-ink">{money(item.price)}</p>
         {item.shipping_payer === "seller" && (

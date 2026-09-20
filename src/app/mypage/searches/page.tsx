@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { savedSearchesOf } from "@/lib/queries";
 import { deleteSavedSearchAction, toggleSearchNotifyAction } from "@/lib/actions";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -8,7 +8,7 @@ import { shortDate } from "@/lib/format";
 export const metadata = { title: "Búsquedas guardadas" };
 
 export default async function SearchesPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/searches");
   const searches = savedSearchesOf(user.id);
 
   return (

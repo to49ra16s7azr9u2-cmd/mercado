@@ -24,13 +24,16 @@ export function OrderList({ orders, empty }: { orders: OrderRow[]; empty: string
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={order.image ?? ""} alt="" className="h-16 w-16 rounded-lg object-cover" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-bold">{order.title}</span>
+                <span className="block truncate text-sm font-bold">
+                  {order.title}
+                  {order.quantity > 1 ? ` × ${order.quantity}` : ""}
+                </span>
                 <span className={`mt-1 inline-block rounded px-2 py-0.5 text-[11px] font-bold ${status.className}`}>
                   {status.label}
                 </span>
                 <span className="mt-1 block text-xs text-muted">{timeAgo(order.created_at)}</span>
               </span>
-              <span className="text-sm font-bold">{money(order.price)}</span>
+              <span className="text-sm font-bold">{money(order.price * order.quantity)}</span>
             </Link>
           </li>
         );

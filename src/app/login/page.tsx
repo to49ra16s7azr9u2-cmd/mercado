@@ -26,7 +26,7 @@ export default async function LogInPage({
       </div>
       <div className="card mt-4 bg-brand-soft p-4 text-center text-xs text-brand-darker">
         <p className="font-bold">Cuenta de demostración</p>
-        <p className="mt-1">demo@mercado.es · contraseña: demo1234</p>
+        <p className="mt-1">demo@mercado.mx · contraseña: demo1234</p>
       </div>
       <p className="mt-4 text-center text-xs text-muted">
         ¿Problemas para entrar? <Link href="/help" className="link">Consulta el centro de ayuda</Link>

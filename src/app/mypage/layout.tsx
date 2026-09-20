@@ -17,7 +17,16 @@ const GROUPS = [
       { href: "/mypage/history", label: "Historial de visitas", icon: "🕘" },
       { href: "/mypage/searches", label: "Búsquedas guardadas", icon: "🔔" },
       { href: "/mypage/follows", label: "Seguidos y seguidores", icon: "👥" },
-      { href: "/mypage/reviews", label: "Valoraciones", icon: "⭐" },
+      { href: "/mypage/reviews", label: "Calificaciones", icon: "⭐" },
+    ],
+  },
+  {
+    title: "Mercado Shops",
+    links: [
+      { href: "/mypage/shop", label: "Mi tienda", icon: "🏪" },
+      { href: "/mypage/shop/items", label: "Inventario", icon: "📦" },
+      { href: "/mypage/shop/orders", label: "Pedidos de la tienda", icon: "🧾" },
+      { href: "/mypage/shops", label: "Tiendas que sigo", icon: "💚" },
     ],
   },
   {

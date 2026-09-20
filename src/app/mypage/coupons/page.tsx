@@ -1,11 +1,11 @@
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { couponsOf } from "@/lib/queries";
 import { money, shortDate } from "@/lib/format";
 
 export const metadata = { title: "Cupones" };
 
 export default async function CouponsPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/coupons");
   const coupons = couponsOf(user.id);
   const now = Date.now();
   const available = coupons.filter((c) => !c.used_at && new Date(c.expires_at).getTime() > now);

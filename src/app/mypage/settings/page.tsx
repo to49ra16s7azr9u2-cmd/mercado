@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { changePasswordAction, logOutAction, updateNotificationSettingsAction } from "@/lib/actions";
 import { NotificationsForm, PasswordForm } from "@/components/SettingsForms";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -8,7 +8,7 @@ import { shortDate } from "@/lib/format";
 export const metadata = { title: "Configuración" };
 
 export default async function SettingsPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/settings");
   return (
     <>
       <h1 className="text-xl font-bold">Configuración</h1>

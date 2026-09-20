@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { ledgerOf, payoutsOf } from "@/lib/queries";
 import { requestPayoutAction } from "@/lib/actions";
 import { PayoutForm } from "@/components/SettingsForms";
@@ -15,7 +15,7 @@ const PAYOUT_STATUS: Record<string, string> = {
 };
 
 export default async function BalancePage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/balance");
   const ledger = ledgerOf(user.id).filter((l) => l.kind === "balance");
   const payouts = payoutsOf(user.id);
 
@@ -27,7 +27,7 @@ export default async function BalancePage() {
         <p className="text-xs text-white/80">Saldo disponible</p>
         <p className="mt-1 text-3xl font-black">{money(user.balance)}</p>
         <p className="mt-2 text-[11px] text-white/80">
-          Importe mínimo para transferir: {MIN_PAYOUT} € · Comisión por transferencia: {PAYOUT_FEE} €
+          Monto mínimo para transferir: {money(MIN_PAYOUT)} · Comisión por transferencia: {money(PAYOUT_FEE)}
         </p>
       </div>
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { listingsOf } from "@/lib/queries";
 import { ItemGrid } from "@/components/ItemCard";
 
@@ -16,7 +16,7 @@ export default async function ListingsPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/listings");
   const { tab } = await searchParams;
   const active = TABS.find((t) => t.value === tab) ?? TABS[0];
   const items = listingsOf(user.id, active.statuses);

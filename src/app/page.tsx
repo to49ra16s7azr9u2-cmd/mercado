@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import {
+  activeShops,
   itemsFromFollowed,
+  itemsFromFollowedShops,
+  shopItemsForHome,
   popularKeywords,
   recentItems,
   recommendedFor,
@@ -11,11 +14,13 @@ import {
 } from "@/lib/queries";
 import { ItemGrid, ItemRow } from "@/components/ItemCard";
 import { Section } from "@/components/Section";
+import { ShopCard } from "@/components/ShopCard";
 
 const BANNERS = [
   { title: "Vende lo que ya no usas", body: "Publica en menos de 2 minutos y cobra sin complicaciones.", cta: "Empezar a vender", href: "/sell", emoji: "📸" },
   { title: "Envíos protegidos", body: "Con seguimiento, anónimos y con garantía de entrega.", cta: "Ver métodos de envío", href: "/guide#envios", emoji: "🚚" },
-  { title: "5 € de regalo", body: "Usa el cupón BIENVENIDA5 en tu primera compra de más de 20 €.", cta: "Ver cupones", href: "/mypage/coupons", emoji: "🎁" },
+  { title: "$100 de regalo", body: "Usa el cupón BIENVENIDA100 en tu primera compra desde $400.", cta: "Ver cupones", href: "/mypage/coupons", emoji: "🎁" },
+  { title: "Mercado Shops", body: "Negocios con inventario, variantes y meses sin intereses.", cta: "Explorar tiendas", href: "/shops", emoji: "🏪" },
 ];
 
 export default async function HomePage() {
@@ -26,6 +31,9 @@ export default async function HomePage() {
   const recommended = user ? recommendedFor(user.id, 20) : recentItems(20);
   const following = user ? itemsFromFollowed(user.id, 12) : [];
   const freeShipping = searchItems({ shippingPayer: "seller", status: "on_sale", perPage: 12 }).items;
+  const shopProducts = shopItemsForHome(12);
+  const shops = activeShops().slice(0, 4);
+  const followedShopItems = user ? itemsFromFollowedShops(user.id, 12) : [];
   const bargains = searchItems({ status: "on_sale", sort: "price_asc", perPage: 12 }).items;
 
   return (
@@ -81,6 +89,31 @@ export default async function HomePage() {
       {user && following.length > 0 && (
         <Section title="Novedades de quien sigues" href="/mypage/follows">
           <ItemRow items={following} />
+        </Section>
+      )}
+
+      {followedShopItems.length > 0 && (
+        <Section title="Novedades de tus tiendas" href="/mypage/shops">
+          <ItemRow items={followedShopItems} />
+        </Section>
+      )}
+
+      {shopProducts.length > 0 && (
+        <Section
+          title="Mercado Shops"
+          subtitle="Productos de negocios con inventario y factura"
+          href="/shops"
+        >
+          <ItemRow items={shopProducts} />
+          {shops.length > 0 && (
+            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+              {shops.map((shop) => (
+                <li key={shop.id}>
+                  <ShopCard shop={shop} items={shop.items} followers={shop.followers} />
+                </li>
+              ))}
+            </ul>
+          )}
         </Section>
       )}
 

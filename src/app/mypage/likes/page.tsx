@@ -1,11 +1,11 @@
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { likedItems } from "@/lib/queries";
 import { ItemGrid } from "@/components/ItemCard";
 
 export const metadata = { title: "Favoritos" };
 
 export default async function LikesPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/likes");
   const items = likedItems(user.id);
   return (
     <>

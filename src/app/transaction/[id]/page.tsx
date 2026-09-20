@@ -55,6 +55,11 @@ export default async function TransactionPage({
       </nav>
       <h1 className="text-xl font-bold">
         {isBuyer ? "Compra" : "Venta"} · {order.title}
+        {order.shop_id && (
+          <span className="ml-2 rounded bg-brand-soft px-1.5 py-0.5 align-middle text-[11px] font-bold text-brand-darker">
+            Shops
+          </span>
+        )}
       </h1>
 
       <ol className="card mt-4 flex overflow-hidden text-center text-[11px]">
@@ -74,7 +79,7 @@ export default async function TransactionPage({
       </ol>
       {cancelled && (
         <p className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          Esta transacción se ha cancelado y el importe se ha devuelto.
+          Esta transacción se ha cancelado y el monto se ha devuelto.
         </p>
       )}
 
@@ -85,7 +90,11 @@ export default async function TransactionPage({
           <Link href={`/item/${order.item_id}`} className="line-clamp-2 text-sm font-bold hover:underline">
             {order.title}
           </Link>
-          <p className="mt-1 text-xs text-muted">Pedido {order.id} · {longDate(order.created_at)}</p>
+          <p className="mt-1 text-xs text-muted">
+            {order.quantity > 1 ? `${order.quantity} piezas · ` : ""}
+            {order.variant_label ? `${order.variant_label} · ` : ""}
+            Pedido {order.id} · {longDate(order.created_at)}
+          </p>
           {order.tracking && (
             <p className="mt-1 text-xs text-muted">
               Seguimiento: <span className="font-bold text-ink">{order.tracking}</span> ·{" "}
@@ -93,14 +102,17 @@ export default async function TransactionPage({
             </p>
           )}
         </div>
-        <p className="text-base font-black">{money(order.price)}</p>
+        <p className="text-base font-black">{money(order.price * order.quantity)}</p>
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <section className="card p-4">
           <h2 className="section-title">{isBuyer ? "Resumen del pago" : "Resumen del cobro"}</h2>
           <dl className="mt-3 space-y-1.5 text-sm">
-            <div className="flex justify-between"><dt className="text-muted">Precio</dt><dd>{money(order.price)}</dd></div>
+            <div className="flex justify-between">
+              <dt className="text-muted">Precio{order.quantity > 1 ? ` × ${order.quantity}` : ""}</dt>
+              <dd>{money(order.price * order.quantity)}</dd>
+            </div>
             <div className="flex justify-between"><dt className="text-muted">Envío</dt><dd>{order.shipping_cost ? money(order.shipping_cost) : "Gratis"}</dd></div>
             {isBuyer ? (
               <>
@@ -124,7 +136,7 @@ export default async function TransactionPage({
                   <dt>Recibirás</dt><dd className="text-brand-darker">{money(order.payout)}</dd>
                 </div>
                 <p className="text-[11px] text-muted">
-                  El importe se añade a tu saldo cuando la transacción se completa.
+                  El monto se agrega a tu saldo cuando la transacción se completa.
                 </p>
               </>
             )}
@@ -178,13 +190,13 @@ export default async function TransactionPage({
               action={confirmReceiptAction}
               orderId={order.id}
               title="Confirma la recepción y valora"
-              cta="Confirmar recepción y enviar valoración"
+              cta="Confirmar recepción y enviar calificación"
             />
           )}
 
           {!isBuyer && order.status === "shipped" && (
             <p className="card p-4 text-sm text-muted">
-              Paquete enviado. Cuando confirmen la recepción podrás valorar y recibirás el importe.
+              Paquete enviado. Cuando confirmen la recepción podrás calificar y recibirás el monto.
             </p>
           )}
 
@@ -192,14 +204,14 @@ export default async function TransactionPage({
             <RatingForm
               action={rateBuyerAction}
               orderId={order.id}
-              title="Valora a quien te ha comprado"
-              cta="Enviar valoración y finalizar"
+              title="Califica a quien te ha comprado"
+              cta="Enviar calificación y finalizar"
             />
           )}
 
           {isBuyer && order.status === "received" && (
             <p className="card p-4 text-sm text-muted">
-              ¡Gracias! Falta que quien vende envíe su valoración para cerrar la transacción.
+              ¡Gracias! Falta que quien vende envíe su calificación para cerrar la transacción.
             </p>
           )}
 
@@ -214,18 +226,18 @@ export default async function TransactionPage({
 
       {(myReview || theirReview) && (
         <section className="card mt-4 p-4">
-          <h2 className="section-title">Valoraciones</h2>
+          <h2 className="section-title">Calificaciones</h2>
           <ul className="mt-3 space-y-3 text-sm">
             {theirReview && (
               <li className="rounded-lg bg-canvas p-3">
-                <p className="text-xs text-muted">{other.name} te ha valorado</p>
+                <p className="text-xs text-muted">{other.name} te ha calificado</p>
                 <p className="mt-1 font-bold">{SCORE_LABEL[theirReview.score]}</p>
                 {theirReview.body && <p className="mt-1 text-muted">{theirReview.body}</p>}
               </li>
             )}
             {myReview && (
               <li className="rounded-lg bg-canvas p-3">
-                <p className="text-xs text-muted">Tu valoración</p>
+                <p className="text-xs text-muted">Tu calificación</p>
                 <p className="mt-1 font-bold">{SCORE_LABEL[myReview.score]}</p>
                 {myReview.body && <p className="mt-1 text-muted">{myReview.body}</p>}
               </li>

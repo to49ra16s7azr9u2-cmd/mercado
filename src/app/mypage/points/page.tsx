@@ -1,4 +1,4 @@
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { ledgerOf } from "@/lib/queries";
 import { buyPointsAction, convertBalanceToPointsAction } from "@/lib/actions";
 import { PointsForm } from "@/components/SettingsForms";
@@ -7,7 +7,7 @@ import { longDate } from "@/lib/format";
 export const metadata = { title: "Puntos" };
 
 export default async function PointsPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/points");
   const ledger = ledgerOf(user.id).filter((l) => l.kind === "points");
 
   return (
@@ -16,7 +16,7 @@ export default async function PointsPage() {
       <div className="card mt-4 p-5 text-center">
         <p className="text-xs text-muted">Puntos disponibles</p>
         <p className="mt-1 text-3xl font-black text-brand-darker">{user.points}</p>
-        <p className="mt-1 text-xs text-muted">Equivalen a {user.points} € de descuento en tus compras.</p>
+        <p className="mt-1 text-xs text-muted">Equivalen a ${user.points} de descuento en tus compras.</p>
       </div>
 
       <PointsForm

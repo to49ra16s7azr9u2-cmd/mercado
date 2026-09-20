@@ -14,7 +14,11 @@ import {
   ratingSummary,
   relatedItems,
   searchItems,
+  shopById,
+  shopRating,
+  isFollowingShop,
   userById,
+  variantsOf,
 } from "@/lib/queries";
 import { run, nowIso } from "@/lib/db";
 import {
@@ -26,9 +30,11 @@ import {
   toggleFollowAction,
   toggleItemPauseAction,
   toggleLikeAction,
+  toggleShopFollowAction,
   updatePriceAction,
 } from "@/lib/actions";
 import { ItemGallery } from "@/components/ItemGallery";
+import { BuyPanel } from "@/components/BuyPanel";
 import { CommentForm, OfferForm, PriceEditor } from "@/components/ItemForms";
 import { ItemRow } from "@/components/ItemCard";
 import { Avatar } from "@/components/Avatar";
@@ -71,6 +77,13 @@ export default async function ItemPage({
   const sold = item.status === "sold" || item.status === "trading";
   const following = user ? isFollowing(user.id, seller.id) : false;
   const myOffer = user ? offers.find((o) => o.user_id === user.id && o.status === "accepted") : undefined;
+  const shop = item.shop_id ? shopById(item.shop_id) : undefined;
+  const variants = shop ? variantsOf(item.id) : [];
+  const shopStars = shop ? shopRating(shop.id) : undefined;
+  const followingShop = user && shop ? isFollowingShop(user.id, shop.id) : false;
+  const availableStock = variants.length
+    ? variants.reduce((sum, v) => sum + v.stock, 0)
+    : item.stock;
 
   // registro de visita e historial
   run("UPDATE items SET views = views + 1 WHERE id = ?", [item.id]);
@@ -97,10 +110,29 @@ export default async function ItemPage({
     ["Talla", item.size || "Sin especificar"],
     ["Color", item.color || "Sin especificar"],
     ["Estado", conditionLabel(item.condition)],
-    ["Gastos de envío", SHIPPING_PAYERS.find((s) => s.value === item.shipping_payer)?.short ?? ""],
+    ["Costo de envío", SHIPPING_PAYERS.find((s) => s.value === item.shipping_payer)?.short ?? ""],
     ["Método de envío", shippingLabel(item.shipping_method)],
     ["Se envía desde", item.ship_from || "Sin especificar"],
     ["Plazo de envío", shipDaysLabel(item.ship_days)],
+    ...(shop
+      ? ([
+          ["Inventario disponible", `${availableStock} pieza${availableStock === 1 ? "" : "s"}`],
+          ...(variants.length
+            ? ([[
+                "Variantes",
+                <span key="variants" className="flex flex-wrap gap-1.5">
+                  {variants.map((v) => (
+                    <span key={v.id} className="chip">
+                      {v.label}: {v.stock}
+                    </span>
+                  ))}
+                </span>,
+              ]] as [string, React.ReactNode][])
+            : []),
+          ["Vendido por", <Link key="shop" href={`/shop/${shop.slug}`} className="link">{shop.name} (Mercado Shops)</Link>],
+          ["Devoluciones", shop.return_policy || "Según la Ley Federal de Protección al Consumidor."],
+        ] as [string, React.ReactNode][])
+      : []),
   ];
 
   return (
@@ -183,14 +215,23 @@ export default async function ItemPage({
                 </p>
               )}
               {item.status === "on_sale" ? (
-                <>
-                  <Link href={`/checkout/${item.id}`} className="btn-primary btn-lg">
-                    Comprar ahora
-                  </Link>
-                  {!!item.offers_enabled && (
-                    <OfferForm action={makeOfferAction} itemId={item.id} price={item.price} />
-                  )}
-                </>
+                shop ? (
+                  <BuyPanel
+                    itemId={item.id}
+                    price={item.price}
+                    stock={item.stock}
+                    variants={variants.map((v) => ({ id: v.id, label: v.label, stock: v.stock }))}
+                  />
+                ) : (
+                  <>
+                    <Link href={`/checkout/${item.id}`} className="btn-primary btn-lg">
+                      Comprar ahora
+                    </Link>
+                    {!!item.offers_enabled && (
+                      <OfferForm action={makeOfferAction} itemId={item.id} price={item.price} />
+                    )}
+                  </>
+                )
               ) : item.status === "stopped" ? (
                 <p className="rounded-lg bg-canvas px-4 py-3 text-center text-sm font-bold text-muted">
                   La venta está pausada temporalmente
@@ -207,7 +248,7 @@ export default async function ItemPage({
                     liked ? "border-brand bg-brand-soft text-brand-darker" : "border-line bg-white text-ink"
                   }`}
                 >
-                  {liked ? "♥ Guardado en favoritos" : "♡ Añadir a favoritos"}
+                  {liked ? "♥ Guardado en favoritos" : "♡ Agregar a favoritos"}
                 </SubmitButton>
               </form>
             </div>
@@ -225,11 +266,47 @@ export default async function ItemPage({
           <div className="mt-6">
             <h2 className="section-title">Descripción</h2>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">
-              {item.description || "Quien vende no ha añadido una descripción."}
+              {item.description || "Quien vende no ha agregado una descripción."}
             </p>
           </div>
 
-          <div className="card mt-6 p-4">
+          {shop && (
+            <div className="card mt-6 overflow-hidden">
+              <div className="flex items-center gap-3 bg-brand-soft p-4">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-2xl">
+                  {shop.cover_emoji}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold text-brand-darker">Mercado Shops · tienda verificada</p>
+                  <Link href={`/shop/${shop.slug}`} className="block truncate text-sm font-bold hover:underline">
+                    {shop.name}
+                  </Link>
+                  <p className="truncate text-xs text-muted">
+                    😊 {shopStars?.good ?? 0} · {shop.category}
+                  </p>
+                </div>
+                {user && user.id !== shop.owner_id && (
+                  <form action={toggleShopFollowAction}>
+                    <input type="hidden" name="shop_id" value={shop.id} />
+                    <input type="hidden" name="slug" value={shop.slug} />
+                    <SubmitButton className={followingShop ? "btn-outline" : "btn-primary"}>
+                      {followingShop ? "Siguiendo" : "Seguir tienda"}
+                    </SubmitButton>
+                  </form>
+                )}
+              </div>
+              <div className="p-4 text-xs text-muted">
+                {shop.description && <p className="leading-relaxed">{shop.description}</p>}
+                <p className="mt-2">
+                  <Link href={`/shop/${shop.slug}/legal`} className="link font-bold">
+                    Información del vendedor y datos fiscales
+                  </Link>
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className={`card p-4 ${shop ? "mt-4" : "mt-6"}`}>
             <div className="flex items-center gap-3">
               <Link href={`/user/${seller.handle}`}>
                 <Avatar seed={seller.avatar_seed} name={seller.name} size={48} />

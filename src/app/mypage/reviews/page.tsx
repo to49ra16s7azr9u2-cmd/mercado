@@ -1,28 +1,28 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { ratingSummary, reviewsOf } from "@/lib/queries";
 import { Avatar } from "@/components/Avatar";
 import { shortDate } from "@/lib/format";
 
-export const metadata = { title: "Valoraciones" };
+export const metadata = { title: "Calificaciones" };
 
 const SCORE: Record<string, string> = { good: "😊 Buena", normal: "😐 Normal", bad: "😞 Mala" };
 
 export default async function ReviewsPage() {
-  const user = (await currentUser())!;
+  const user = await requireUser("/mypage/reviews");
   const rating = ratingSummary(user.id);
   const reviews = reviewsOf(user.id);
 
   return (
     <>
-      <h1 className="text-xl font-bold">Valoraciones recibidas</h1>
+      <h1 className="text-xl font-bold">Calificaciones recibidas</h1>
       <div className="card mt-4 grid grid-cols-3 divide-x divide-line text-center">
         <div className="p-4"><p className="text-2xl font-black">{rating.good}</p><p className="text-xs text-muted">😊 Buenas</p></div>
         <div className="p-4"><p className="text-2xl font-black">{rating.normal}</p><p className="text-xs text-muted">😐 Normales</p></div>
         <div className="p-4"><p className="text-2xl font-black">{rating.bad}</p><p className="text-xs text-muted">😞 Malas</p></div>
       </div>
       {reviews.length === 0 ? (
-        <p className="card mt-4 p-8 text-center text-sm text-muted">Todavía no tienes valoraciones.</p>
+        <p className="card mt-4 p-8 text-center text-sm text-muted">Todavía no tienes calificaciones.</p>
       ) : (
         <ul className="card mt-4 divide-y divide-line">
           {reviews.map((review) => (

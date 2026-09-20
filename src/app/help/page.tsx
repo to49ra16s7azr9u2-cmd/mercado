@@ -7,7 +7,7 @@ const FAQS = [
     id: "seguridad",
     title: "Compra y venta seguras",
     items: [
-      ["¿Cuándo cobra quien vende?", "Retenemos el importe hasta que quien compra confirma la recepción y valora la transacción."],
+      ["¿Cuándo cobra quien vende?", "Retenemos el monto hasta que quien compra confirma la recepción y califica la transacción."],
       ["¿Se ve mi dirección?", "Con los envíos de Mercado tu dirección permanece oculta para la otra parte."],
       ["¿Puedo pagar fuera de la plataforma?", "No. Pagar o cobrar fuera de Mercado anula todas las protecciones y está prohibido."],
     ],
@@ -61,7 +61,7 @@ export default function HelpPage() {
       <section id="contacto" className="mt-10 scroll-mt-28">
         <h2 className="text-lg font-bold">Contactar con el equipo</h2>
         <div className="card mt-3 p-4 text-sm">
-          <p>Escríbenos a <span className="font-bold">ayuda@mercado.es</span> y te respondemos en menos de 24 h.</p>
+          <p>Escríbenos a <span className="font-bold">ayuda@mercado.mx</span> y te respondemos en menos de 24 h.</p>
           <p className="mt-2 text-muted">
             Si tu duda es sobre un artículo concreto, incluye el enlace. También puedes{" "}
             <Link href="/report" className="link">denunciar un contenido</Link>.

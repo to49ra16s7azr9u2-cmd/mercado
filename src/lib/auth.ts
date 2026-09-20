@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
 import { get, run, nowIso, newId } from "./db";
 import type { User } from "./types";
@@ -55,8 +56,13 @@ export async function currentUser(): Promise<User | null> {
   return user ?? null;
 }
 
-export async function requireUser(): Promise<User> {
+/**
+ * Devuelve la persona autenticada o la manda a iniciar sesión.
+ * El layout de «Mi cuenta» y sus páginas se renderizan en paralelo, así que cada
+ * página debe protegerse por su cuenta.
+ */
+export async function requireUser(next = "/mypage"): Promise<User> {
   const user = await currentUser();
-  if (!user) throw new Error("AUTH_REQUIRED");
+  if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
   return user;
 }

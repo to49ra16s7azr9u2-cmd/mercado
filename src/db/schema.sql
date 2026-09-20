@@ -42,6 +42,36 @@ CREATE TABLE IF NOT EXISTS brands (
   name  TEXT NOT NULL UNIQUE
 );
 
+CREATE TABLE IF NOT EXISTS shops (
+  id             TEXT PRIMARY KEY,
+  owner_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name           TEXT NOT NULL,
+  slug           TEXT NOT NULL UNIQUE,
+  description    TEXT NOT NULL DEFAULT '',
+  category       TEXT NOT NULL DEFAULT '',
+  logo_seed      TEXT NOT NULL DEFAULT '0',
+  cover_emoji    TEXT NOT NULL DEFAULT '🛍️',
+  business_type  TEXT NOT NULL DEFAULT 'persona_fisica',
+  legal_name     TEXT NOT NULL DEFAULT '',
+  rfc            TEXT NOT NULL DEFAULT '',
+  legal_address  TEXT NOT NULL DEFAULT '',
+  legal_phone    TEXT NOT NULL DEFAULT '',
+  legal_email    TEXT NOT NULL DEFAULT '',
+  return_policy  TEXT NOT NULL DEFAULT '',
+  delivery_note  TEXT NOT NULL DEFAULT '',
+  ship_from      TEXT NOT NULL DEFAULT '',
+  status         TEXT NOT NULL DEFAULT 'pending',
+  created_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_shops_owner ON shops(owner_id);
+
+CREATE TABLE IF NOT EXISTS shop_follows (
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  shop_id    TEXT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, shop_id)
+);
+
 CREATE TABLE IF NOT EXISTS items (
   id             TEXT PRIMARY KEY,
   seller_id      TEXT NOT NULL REFERENCES users(id),
@@ -59,6 +89,8 @@ CREATE TABLE IF NOT EXISTS items (
   ship_days      INTEGER NOT NULL DEFAULT 1,
   status         TEXT NOT NULL DEFAULT 'on_sale',
   offers_enabled INTEGER NOT NULL DEFAULT 1,
+  shop_id        TEXT REFERENCES shops(id),
+  stock          INTEGER NOT NULL DEFAULT 1,
   views          INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL
@@ -66,6 +98,17 @@ CREATE TABLE IF NOT EXISTS items (
 CREATE INDEX IF NOT EXISTS idx_items_seller ON items(seller_id);
 CREATE INDEX IF NOT EXISTS idx_items_status ON items(status);
 CREATE INDEX IF NOT EXISTS idx_items_cat ON items(category_id);
+CREATE INDEX IF NOT EXISTS idx_items_shop ON items(shop_id);
+
+CREATE TABLE IF NOT EXISTS item_variants (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id  TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  label    TEXT NOT NULL,
+  sku      TEXT NOT NULL DEFAULT '',
+  stock    INTEGER NOT NULL DEFAULT 0,
+  position INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_variants_item ON item_variants(item_id);
 
 CREATE TABLE IF NOT EXISTS item_images (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,6 +150,9 @@ CREATE TABLE IF NOT EXISTS orders (
   buyer_id       TEXT NOT NULL REFERENCES users(id),
   seller_id      TEXT NOT NULL REFERENCES users(id),
   price          INTEGER NOT NULL,
+  quantity       INTEGER NOT NULL DEFAULT 1,
+  shop_id        TEXT REFERENCES shops(id),
+  variant_label  TEXT NOT NULL DEFAULT '',
   points_used    INTEGER NOT NULL DEFAULT 0,
   coupon_id      TEXT,
   coupon_amount  INTEGER NOT NULL DEFAULT 0,
